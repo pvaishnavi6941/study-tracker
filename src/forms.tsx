@@ -230,6 +230,7 @@ export function TopicManager({
   notify,
   ask,
   onPlan,
+  onImport,
 }: {
   data: Data;
   skill: Skill;
@@ -241,6 +242,7 @@ export function TopicManager({
     action: () => boolean | Promise<boolean>,
   ) => void;
   onPlan: () => void;
+  onImport: () => void;
 }) {
   const [editing, setEditing] = useState<Topic | null>(null),
     [name, setName] = useState(""),
@@ -252,6 +254,18 @@ export function TopicManager({
         Break your skill into topics. Completed topics determine your learning
         progress.
       </p>
+      <div className="topic-management-actions">
+        <a
+          className="secondary small"
+          href="/Cadence_Blank_Topic_Template.xlsx"
+          download
+        >
+          Download Template
+        </a>
+        <button className="secondary small" onClick={onImport}>
+          Import Topics
+        </button>
+      </div>
       <form
         className="topic-add"
         onSubmit={async (e) => {
@@ -386,6 +400,7 @@ export function TopicManager({
                 <strong className={done ? "completed-topic" : ""}>
                   {t.name}
                 </strong>
+                <span className="badge">{t.priority || "Medium"}</span>
                 <button
                   className="icon-button subtle"
                   aria-label={`Edit topic ${t.name}`}
@@ -630,7 +645,7 @@ export function FinishSession({
       />
       <label className="switch-row inset">
         <span>Mark topic complete</span>
-        <input role="switch" type="checkbox" name="complete" defaultChecked />
+        <input role="switch" type="checkbox" name="complete" />
       </label>
       <button className="primary full">Save study session</button>
     </form>

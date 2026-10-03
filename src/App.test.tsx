@@ -78,6 +78,7 @@ describe("major user flows", () => {
     await user.click(screen.getByRole("button", { name: "React.js" }));
     await user.click(screen.getByRole("button", { name: "Effects" }));
     await user.type(screen.getByLabelText("NOTES"), "Cleanup clicked");
+    await user.click(screen.getByRole("switch", { name: "Mark topic complete" }));
     await user.click(
       screen.getByRole("button", { name: "Add 45m of React.js" }),
     );

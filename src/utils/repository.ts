@@ -6,7 +6,7 @@ export type Profile = {
   displayName: string;
   avatarUrl: string | null;
 };
-export type Snapshot = { revision: number; profile: Profile; data: Data };
+export type Snapshot = { revision: number; profile: Profile; data: Data; topicImportReady?: boolean };
 export type RowChanges<T> = { upsert: T[]; delete: string[] };
 export type Changes = {
   skills: RowChanges<Data["skills"][number]>;

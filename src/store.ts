@@ -152,6 +152,7 @@ export function useStudyData(userId: string) {
   return {
     data: snapshot?.data || emptyData(),
     profile: snapshot?.profile || null,
+    topicImportReady: snapshot?.topicImportReady === true,
     update,
     error,
     loading,

@@ -28,9 +28,20 @@ export function changesConfirmed(
     const oldRows = new Map(before[key].map((row) => [row.id, row]));
     const newRows = new Map(next[key].map((row) => [row.id, row]));
     const serverRows = new Map(actual[key].map((row) => [row.id, row]));
-    for (const [id, row] of newRows)
-      if (!equal(row, oldRows.get(id)) && !equal(row, serverRows.get(id)))
-        return false;
+    for (const [id, row] of newRows) {
+      let actualRow = serverRows.get(id);
+      if (key === "topics" && actualRow) {
+        // The database assigns metadata for old backups/manual topic creation.
+        // Compare only metadata supplied by the intended write.
+        const intended = row as Data["topics"][number];
+        actualRow = { ...actualRow };
+        if (intended.priority === undefined)
+          delete (actualRow as Data["topics"][number]).priority;
+        if (intended.sortOrder === undefined)
+          delete (actualRow as Data["topics"][number]).sortOrder;
+      }
+      if (!equal(row, oldRows.get(id)) && !equal(row, actualRow)) return false;
+    }
     for (const id of oldRows.keys())
       if (!newRows.has(id) && serverRows.has(id)) return false;
   }

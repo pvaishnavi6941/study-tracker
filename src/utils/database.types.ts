@@ -40,6 +40,8 @@ export type Database = {
           name: string;
           completed: boolean;
           completed_at: string | null;
+          priority: "High" | "Medium" | "Low";
+          sort_order: number;
         }
       >;
       study_sessions: Table<

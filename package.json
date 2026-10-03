@@ -25,6 +25,7 @@
     "@vitejs/plugin-react": "5.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "read-excel-file": "^9.3.10",
     "recharts": "^3.10.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
@@ -35,6 +36,7 @@
     "@playwright/test": "^1.63.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "fflate": "^0.8.3",
     "jsdom": "^26.1.0",
     "prettier": "^3.6.2",
     "vitest": "^3.2.4"
