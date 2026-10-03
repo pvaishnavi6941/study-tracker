@@ -120,3 +120,61 @@ export async function saveSnapshot(
     signal?.removeEventListener("abort", abort);
   }
 }
+
+export type Relation = "self" | "friend" | "requested" | "incoming" | "none";
+export type Member = {
+  id: string;
+  displayName: string;
+  relation: Relation;
+  streak: number | null;
+  weekHours: number | null;
+  studyingNow: boolean | null;
+};
+export type FriendAction =
+  | "request"
+  | "accept"
+  | "decline"
+  | "cancel"
+  | "remove";
+const RELATIONS: Relation[] = [
+  "self",
+  "friend",
+  "requested",
+  "incoming",
+  "none",
+];
+export function parseMembers(raw: unknown): Member[] {
+  if (!Array.isArray(raw)) throw new Error("Invalid friends response.");
+  return raw.map((m) => {
+    const r = m as Record<string, unknown>;
+    if (typeof r.id !== "string" || !RELATIONS.includes(r.relation as Relation))
+      throw new Error("Invalid friends response.");
+    const num = (v: unknown) => (typeof v === "number" ? v : null);
+    return {
+      id: r.id,
+      displayName: typeof r.displayName === "string" ? r.displayName : "",
+      relation: r.relation as Relation,
+      streak: num(r.streak),
+      weekHours: num(r.weekHours),
+      studyingNow: typeof r.studyingNow === "boolean" ? r.studyingNow : null,
+    };
+  });
+}
+export async function loadSocial(
+  today: string,
+  weekStart: string,
+): Promise<Member[]> {
+  const { data, error } = await requireSupabase().rpc("cadence_social", {
+    today,
+    week_start: weekStart,
+  });
+  if (error) throw error;
+  return parseMembers(data);
+}
+export async function friendAction(target: string, action: FriendAction) {
+  const { error } = await requireSupabase().rpc("cadence_friend_action", {
+    target,
+    action,
+  });
+  if (error) throw error;
+}

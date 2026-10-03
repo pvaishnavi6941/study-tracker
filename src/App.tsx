@@ -4,6 +4,7 @@ import {
   Stack,
   PlusSquare,
   Flame,
+  UsersThree,
   ChartBar,
   GearSix,
   Plus,
@@ -65,7 +66,15 @@ import {
   formatSeconds,
 } from "./forms";
 import { SessionRow, History, Heatmap } from "./history";
-type Page = "Today" | "Skills" | "Log" | "Streak" | "Analytics" | "Settings";
+import { FriendsPage } from "./friends";
+type Page =
+  | "Today"
+  | "Skills"
+  | "Log"
+  | "Streak"
+  | "Friends"
+  | "Analytics"
+  | "Settings";
 type Dialog =
   | { kind: "topic-import"; skillId?: string }
   | {
@@ -121,6 +130,10 @@ const nav = [
     icon: Flame,
   },
   {
+    name: "Friends",
+    icon: UsersThree,
+  },
+  {
     name: "Analytics",
     icon: ChartBar,
   },
@@ -168,6 +181,7 @@ export function App({ userId }: { userId: string }) {
       "Skills",
       "Log",
       "Streak",
+      "Friends",
       "Analytics",
       "Settings",
     ].includes(p)
@@ -515,13 +529,17 @@ export function App({ userId }: { userId: string }) {
         ? "Today counts. Keep it going tomorrow."
         : "A little progress today goes a long way.",
     },
+    Friends: {
+      title: "Friends",
+      description: "Study alongside people on Ashvi and keep each other going.",
+    },
     Analytics: {
       title: "Analytics",
       description: "How your hours, skills and consistency add up.",
     },
     Settings: {
       title: "Settings",
-      description: "Make Cadence yours. Keep your learning history safe.",
+      description: "Make Ashvi yours. Keep your learning history safe.",
     },
   };
   const emptySessions = (action?: ReactNode) => (
@@ -535,7 +553,7 @@ export function App({ userId }: { userId: string }) {
     return (
       <div className="auth-shell">
         <Card className="auth-card account-loading">
-          <img src="/assets/cadence-orb.png" alt="" />
+          <img src="/assets/ashvi.png" alt="" />
           <h2>Loading your study space</h2>
           <p role="status">Fetching your account’s progress from Supabase…</p>
           <span className="loading-line" />
@@ -567,9 +585,9 @@ export function App({ userId }: { userId: string }) {
       <fieldset className="app-fieldset" disabled={saving}>
         <header className="brand-row">
           <a className="brand" href="#Today" onClick={() => go("Today")}>
-            <img src="/assets/cadence-orb.png" alt="" />
+            <img src="/assets/ashvi.png" alt="" />
             <div>
-              <strong>Cadence</strong>
+              <strong>Ashvi</strong>
               <span>
                 {new Date(now).toLocaleDateString(undefined, {
                   weekday: "long",
@@ -1532,6 +1550,7 @@ export function App({ userId }: { userId: string }) {
               </Card>
             </>
           )}
+          {page === "Friends" && <FriendsPage today={today} />}
           {page === "Analytics" && (
             <>
               <Card className="analytics-hours">
@@ -1838,7 +1857,7 @@ export function App({ userId }: { userId: string }) {
                 <div className="settings-divider" />
                 <h2>Fresh start</h2>
                 <p>
-                  Delete your study history, or reset Cadence and start setup
+                  Delete your study history, or reset Ashvi and start setup
                   again. Export a backup before continuing.
                 </p>
                 <button
@@ -1868,7 +1887,7 @@ export function App({ userId }: { userId: string }) {
                   className="text-button danger-text"
                   onClick={() =>
                     ask(
-                      "Reset Cadence?",
+                      "Reset Ashvi?",
                       "This removes all data and preferences and restarts onboarding. Type DELETE to continue.",
                       async () => await update(() => emptyData(), true),
                       true,
@@ -1882,7 +1901,7 @@ export function App({ userId }: { userId: string }) {
           )}
         </main>
         <footer className="app-footer">
-          A little every day adds up.<span>Cadence</span>
+          A little every day adds up.<span>Ashvi</span>
         </footer>
         {toast && (
           <div className="toast" role="status">

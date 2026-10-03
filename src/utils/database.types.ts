@@ -73,6 +73,14 @@ export type Database = {
         Args: { expected_revision: number; changes: Json };
         Returns: Json;
       };
+      cadence_social: {
+        Args: { today: string; week_start: string };
+        Returns: Json;
+      };
+      cadence_friend_action: {
+        Args: { target: string; action: string };
+        Returns: undefined;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
