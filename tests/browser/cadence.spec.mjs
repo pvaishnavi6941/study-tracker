@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { completedWorkbook } from './workbook.mjs';
 
 // Browser integration uses the real SDK and migration with isolated PostgreSQL.
 // Auth HTTP is simulated; no accounts, emails, or rows reach the live project.
@@ -11,12 +12,14 @@ test('auth, PostgreSQL persistence, calculations, and two-user isolation through
   page.on('pageerror', error => errors.push(error.message));
   const accounts = new Map();
   const sessions = new Map();
+  let failNextSave = false;
   const password = 'isolated-test-password';
   await db.exec(`create role anon; create role authenticated; create schema auth;
     create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     grant usage on schema public,auth to anon,authenticated; grant execute on function auth.uid() to anon,authenticated;`);
   await db.exec(fs.readFileSync('supabase/migrations/202610030001_cadence.sql', 'utf8'));
+  await db.exec(fs.readFileSync('supabase/migrations/202610030002_topic_import.sql', 'utf8'));
   const catalog = await db.exec(fs.readFileSync('supabase/verify-cadence.sql', 'utf8'));
   const metadata = JSON.parse(catalog.find(result => result.rows.length)?.rows[0].cadence_schema_verification);
   expect(metadata.tables).toHaveLength(5);
@@ -69,6 +72,11 @@ test('auth, PostgreSQL persistence, calculations, and two-user isolation through
     });
     await client.route('**/rest/v1/**', async route => {
       const req = route.request(), url = new URL(req.url());
+      if (failNextSave && url.pathname.endsWith('/cadence_apply_changes')) {
+        failNextSave = false;
+        await route.fulfill({ status: 503, json: { code: 'SERVICE_UNAVAILABLE', message: 'Test connection unavailable' } });
+        return;
+      }
       const user = sessions.get(req.headers().authorization?.replace('Bearer ', ''));
       try {
         const result = await db.transaction(async tx => {
@@ -123,6 +131,7 @@ test('auth, PostgreSQL persistence, calculations, and two-user isolation through
     await page.getByRole('button', { name: 'JavaScript', exact: true }).click();
     await page.getByRole('button', { name: 'Closures', exact: true }).click();
     await page.getByLabel('NOTES', { exact: true }).fill('Browser integration verification');
+    await page.getByRole('switch', { name: 'Mark topic complete' }).click();
     await page.getByRole('button', { name: 'Add 45m of JavaScript', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Edit session Closures' })).toBeVisible();
     await page.getByRole('button', { name: 'Today', exact: true }).click();
@@ -190,6 +199,104 @@ test('auth, PostgreSQL persistence, calculations, and two-user isolation through
     await page.getByRole('button', { name: 'Delete session Closures' }).click();
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect(page.getByText('No study sessions yet')).toBeVisible();
+    // Excel flow: official download, exact row errors, atomic import, duplicate
+    // prevention, separate skills, priority focus, actual time, reload, isolation.
+    await page.setViewportSize({ width: 1360, height: 1000 });
+    await page.getByRole('button', { name: 'Skills', exact: true }).click();
+    const downloadEvent = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Download Template', exact: true }).click();
+    const templateDownload = await downloadEvent;
+    expect(templateDownload.suggestedFilename()).toBe('Cadence_Blank_Topic_Template.xlsx');
+    expect(fs.readFileSync(await templateDownload.path()).equals(fs.readFileSync('public/Cadence_Blank_Topic_Template.xlsx'))).toBe(true);
+    await context.grantPermissions(['clipboard-read','clipboard-write']);
+    await page.getByText('How to create your topic list', { exact: true }).click();
+    await page.getByRole('button', { name: 'Copy', exact: true }).click();
+    await expect(page.getByText('Prompt copied.', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await page.locator('.topic-prompt').innerText());
+    await page.getByRole('button', { name: 'Import Topics', exact: true }).click();
+    await page.getByLabel('STEP 2 · UPLOAD EXCEL').setInputFiles('public/Cadence_Blank_Topic_Template.xlsx');
+    await expect(page.locator('.import-preview')).toContainText('workbook has no topics');
+    await page.getByLabel('STEP 2 · UPLOAD EXCEL').setInputFiles({name:'invalid.txt',mimeType:'text/plain',buffer:Buffer.from('invalid')});
+    await expect(page.getByRole('alert').last()).toContainText('Choose an .xlsx');
+    await page.getByLabel('STEP 2 · UPLOAD EXCEL').setInputFiles({name:'invalid.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:completedWorkbook([['Valid topic','High'],[],['','Low'],['Invalid priority','Urgent']])});
+    await expect(page.locator('.import-preview')).toContainText('Row 4:');
+    await expect(page.locator('.import-preview')).toContainText('Row 5:');
+    await expect(page.getByRole('button', { name: /Import \d+ Topics/ })).toBeDisabled();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.locator('.skill-card')).toContainText('0 of 1 topics');
+    async function uploadTopics(rows, skillName, create=false) {
+      await page.getByRole('button', { name: 'Import Topics', exact: true }).click();
+      if (create) { await page.getByLabel('STEP 1 · SELECT SKILL').selectOption('new'); await page.getByLabel('NEW SKILL NAME').fill(skillName); }
+      else await page.getByLabel('STEP 1 · SELECT SKILL').selectOption({label:skillName});
+      await page.getByLabel('STEP 2 · UPLOAD EXCEL').setInputFiles({name:'completed.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:completedWorkbook(rows)});
+      await expect(page.locator('.import-preview')).toContainText(`${rows.length} topics found`);
+      await page.getByRole('button', { name: `Import ${rows.length} Topics`, exact: true }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
+    const jsRows = [['Events','Low'],[' Promises ','High'],['Lexical scope','High'],['Browser APIs','Medium']];
+    await uploadTopics(jsRows,'JavaScript');
+    await expect(page.locator('.skill-card')).toContainText('0 of 5 topics');
+    await page.getByRole('button', { name: 'Import Topics', exact: true }).click();
+    await page.getByLabel('STEP 2 · UPLOAD EXCEL').setInputFiles({name:'duplicates.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:completedWorkbook(jsRows)});
+    await expect(page.locator('.import-preview')).toContainText('duplicates a topic');
+    await expect(page.getByRole('button', { name: /Import \d+ Topics/ })).toBeDisabled();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await uploadTopics([['Components & Props','High'],['useState','Medium']],'React.js',true);
+    await expect(page.locator('.skill-card').filter({has:page.getByRole('heading',{name:'React.js',exact:true})})).toContainText('0 of 2 topics');
+    await page.reload();
+    await expect(page.locator('.skill-card')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Today', exact: true }).click();
+    await expect(page.locator('.topic-focus .row-copy strong')).toHaveText(['Promises','Lexical scope','Components & Props']);
+    await expect(page.locator('.topic-focus')).not.toContainText('45m');
+    await page.getByRole('button', {name:'Log time for Promises',exact:true}).click();
+    await page.getByLabel('DURATION', {exact:true}).fill('20');
+    await expect(page.getByRole('switch', { name: 'Mark topic complete' })).not.toBeChecked();
+    await page.getByRole('button',{name:'Add 20m of JavaScript',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Edit session Promises'})).toBeVisible();
+    await page.getByRole('button',{name:'Today',exact:true}).click();
+    await expect(page.locator('.topic-focus .row-copy strong').first()).toHaveText('Promises');
+    await page.getByRole('button',{name:'Log',exact:true}).click();
+    await page.getByRole('button',{name:'Edit session Promises'}).click();
+    await page.getByRole('switch', { name: 'Mark topic complete' }).click();
+    await page.getByRole('button', {name:'Save changes',exact:true}).click();
+    await page.getByRole('button',{name:'Today',exact:true}).click();
+    await expect(page.locator('.topic-focus .row-copy strong')).toHaveText(['Lexical scope','Components & Props','Closures']);
+    await expect(page.locator('.mini-stats .inset').filter({hasText:'STUDIED'})).toContainText('20m');
+    await page.getByRole('button',{name:'Skills',exact:true}).click();
+    await screenshot('excel-import-skills');
+    await page.getByRole('button',{name:'Import Topics',exact:true}).click();
+    await page.getByLabel('STEP 1 · SELECT SKILL').selectOption({label:'JavaScript'});
+    await page.getByLabel('STEP 2 · UPLOAD EXCEL').setInputFiles({name:'preview.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:completedWorkbook([['Next topic','Medium']])});
+    await expect(page.locator('.import-preview')).toContainText('1 topics found');
+    const modalBounds=await page.getByRole('dialog').boundingBox();
+    expect(Math.abs(modalBounds.x-(1360-modalBounds.width)/2)).toBeLessThan(2);
+    await screenshot('excel-import-preview');
+    await page.setViewportSize({width:320,height:844});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(320);
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
+    await page.getByRole('button',{name:'Import Topics',exact:true}).click();
+    await page.getByLabel('STEP 1 · SELECT SKILL').selectOption('new');
+    await page.getByLabel('NEW SKILL NAME').fill(' javascript ');
+    await expect(page.getByRole('dialog')).toContainText('This skill already exists');
+    await page.getByLabel('STEP 2 · UPLOAD EXCEL').setInputFiles({name:'retry.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:completedWorkbook([['Retry topic','Medium']])});
+    await expect(page.locator('.import-preview')).toContainText('1 topics found');
+    failNextSave = true;
+    await page.getByRole('button',{name:'Import 1 Topics',exact:true}).click();
+    await expect(page.getByRole('dialog')).toContainText('Test connection unavailable');
+    await expect(page.locator('.import-preview')).toContainText('1 topics found');
+    expect((await db.query('select count(*)::int as count from public.topics')).rows[0].count).toBe(7);
+    await page.getByRole('button',{name:'Import 1 Topics',exact:true}).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('.skill-card')).toHaveCount(2);
+    expect((await db.query('select count(*)::int as count from public.topics')).rows[0].count).toBe(8);
+    await page.reload();
+    await expect(page.locator('.skill-card').filter({has:page.getByRole('heading',{name:'JavaScript',exact:true})})).toContainText('1 of 6 topics');
+    await logout(page); await login(page,'b@example.test');
+    await page.getByRole('button',{name:'Skills',exact:true}).click();
+    await expect(page.locator('.skill-card')).toHaveCount(0);
+    await logout(page); await login(page,a.email);
+    await page.getByRole('button',{name:'Skills',exact:true}).click();
+    await expect(page.locator('.skill-card')).toHaveCount(2);
     expect(errors).toEqual([]);
   } finally {
     await second?.close();

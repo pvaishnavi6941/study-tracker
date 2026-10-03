@@ -19,9 +19,12 @@ async function save(c,revision,changes){const {data,error}=await c.rpc('cadence_
 try{
  userId=await login(a,config.CADENCE_TEST_EMAIL_A,config.CADENCE_TEST_PASSWORD_A);
  const bId=await login(b,config.CADENCE_TEST_EMAIL_B,config.CADENCE_TEST_PASSWORD_B);assert.notEqual(userId,bId);
- const initial=await snapshot(a),stamp=new Date().toISOString(),date=new Date(),studyDate=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`,time=date.toTimeString().slice(0,5);
+ const initial=await snapshot(a);assert.equal(initial.topicImportReady,true,'Apply the topic import priority migration before live verification');
+ const sortOrder=Math.max(-1,...initial.data.topics.map(t=>t.sortOrder))+1;
+ const stamp=new Date().toISOString(),date=new Date(),studyDate=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`,time=date.toTimeString().slice(0,5);
  const sessionRow={id:created.session,skillId:created.skill,topicId:created.topic,topic:'Live integration verification',minutes:45,date:studyDate,time,startedAt:stamp,notes:'Dedicated account integration test',completed:true,createdAt:stamp};
- let s=await save(a,initial.revision,{skills:{upsert:[{id:created.skill,name:'Cadence integration test',targetHours:10,color:'#49cee3',createdAt:stamp}],delete:[]},topics:{upsert:[{id:created.topic,skillId:created.skill,name:sessionRow.topic,completedAt:null,createdAt:stamp}],delete:[]},sessions:{upsert:[sessionRow],delete:[]}});
+ let s=await save(a,initial.revision,{skills:{upsert:[{id:created.skill,name:'Cadence integration test',targetHours:10,color:'#49cee3',createdAt:stamp}],delete:[]},topics:{upsert:[{id:created.topic,skillId:created.skill,name:sessionRow.topic,completedAt:null,createdAt:stamp,priority:'High',sortOrder}],delete:[]},sessions:{upsert:[sessionRow],delete:[]}});
+ assert.equal(s.data.topics.find(t=>t.id===created.topic).priority,'High');assert.equal(s.data.topics.find(t=>t.id===created.topic).sortOrder,sortOrder);
  assert.equal(s.data.sessions.find(x=>x.id===created.session).minutes,45);
  assert.ok((await snapshot(a)).data.sessions.some(x=>x.id===created.session),'Refresh must retain the session');
  await login(aDevice2,config.CADENCE_TEST_EMAIL_A,config.CADENCE_TEST_PASSWORD_A);

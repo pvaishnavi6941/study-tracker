@@ -11,7 +11,23 @@ export type Topic = {
   name: string;
   createdAt: string;
   completedAt: string | null;
+  priority?: "High" | "Medium" | "Low";
+  sortOrder?: number;
 };
+export function incompleteTopics(data: Data) {
+  const rank = { High: 0, Medium: 1, Low: 2 };
+  const order = new Map(
+    data.topics.map((topic, index) => [topic.id, topic.sortOrder ?? index]),
+  );
+  return data.topics
+    .filter((topic) => !isTopicComplete(data, topic))
+    .sort(
+      (a, b) =>
+        rank[a.priority || "Medium"] - rank[b.priority || "Medium"] ||
+        order.get(a.id)! - order.get(b.id)! ||
+        Date.parse(a.createdAt) - Date.parse(b.createdAt),
+    );
+}
 export type Session = {
   id: string;
   skillId: string;
@@ -351,7 +367,11 @@ export function validateData(raw: unknown): Data {
         text(t.name, 200) &&
         t.name.trim() &&
         timestamp(t.createdAt) &&
-        (t.completedAt === null || timestamp(t.completedAt)),
+        (t.completedAt === null || timestamp(t.completedAt)) &&
+        (t.priority === undefined ||
+          ["High", "Medium", "Low"].includes(t.priority)) &&
+        (t.sortOrder === undefined ||
+          (Number.isSafeInteger(t.sortOrder) && num(t.sortOrder, 2147483647))),
     )
   )
     return fail();

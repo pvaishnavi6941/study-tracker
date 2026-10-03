@@ -8,7 +8,7 @@ if (!url || !key) throw new Error('Configure the public Supabase variables in .e
 const headers = { apikey: key, 'Content-Type': 'application/json' };
 const checks = [
   { endpoint: '/auth/v1/settings' },
-  ...['profiles', 'skills', 'topics', 'study_sessions', 'study_plans'].map(table => ({ endpoint: `/rest/v1/${table}?select=id&limit=0` })),
+  ...['profiles', 'skills', 'topics', 'study_sessions', 'study_plans'].map(table => ({ endpoint: `/rest/v1/${table}?select=${table === 'topics' ? 'id,priority,sort_order' : 'id'}&limit=0` })),
   { endpoint: '/rest/v1/rpc/cadence_snapshot', body: {} },
   { endpoint: '/rest/v1/rpc/cadence_apply_changes', body: { expected_revision: 0, changes: {} } },
 ];

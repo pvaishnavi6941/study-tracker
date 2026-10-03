@@ -11,6 +11,7 @@ before(async()=>{
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     grant usage on schema public,auth to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;`);
   await db.exec(fs.readFileSync('supabase/migrations/202610030001_cadence.sql','utf8'));
+  await db.exec(fs.readFileSync('supabase/migrations/202610030002_topic_import.sql','utf8'));
 });
 beforeEach(async()=>{await db.exec(`reset role;delete from auth.users;insert into auth.users(id,raw_user_meta_data) values ('${a}','{"display_name":"User A"}'),('${b}','{"display_name":"User B"}');`);});
 after(async()=>{await db.close();});
@@ -29,3 +30,19 @@ test('editing and deleting sessions change the next snapshot',async()=>{await as
 test('topic deletion preserves session time as unlinked history',async()=>{await asUser(a);const s=await save(0,changes());const next=await save(s.revision,{topics:{upsert:[],delete:[topic]}});assert.deepEqual(next.data.topics,[]);assert.equal(next.data.sessions[0].topicId,null);assert.equal(next.data.sessions[0].minutes,45);});
 test('timer and fractional elapsed duration round-trip through PostgreSQL',async()=>{await asUser(a);const c=changes();c.sessions.upsert[0].minutes=65/60;c.timer={skillId:skill,topicId:topic,topic:'Closures',planId:null,elapsed:42,startedAt:null,date:'2026-10-03',time:'12:00'};const s=await save(0,c);assert.equal(s.data.timer.elapsed,42);assert.equal(s.data.sessions[0].minutes,65/60);});
 test('skill deletion cascades only its owner’s related data',async()=>{await asUser(a);const s=await save(0,changes());const next=await save(s.revision,{skills:{upsert:[],delete:[skill]}});assert.deepEqual(next.data.skills,[]);assert.deepEqual(next.data.topics,[]);assert.deepEqual(next.data.sessions,[]);await asUser(b);assert.equal((await snapshot()).profile.id,b);});
+test('imported priorities and order persist and imported topic RLS denies User B CRUD',async()=>{
+  await asUser(a);const c=changes();c.sessions.upsert=[];
+  c.topics.upsert[0]={...c.topics.upsert[0],priority:'High',sortOrder:1};
+  c.topics.upsert.push({...c.topics.upsert[0],id:'66666666-6666-4666-8666-666666666666',name:'Low first',priority:'Low',sortOrder:0},
+    {...c.topics.upsert[0],id:'77777777-7777-4777-8777-777777777777',name:'High second',sortOrder:2});
+  const s=await save(0,c);assert.equal(s.topicImportReady,true);
+  assert.deepEqual((await snapshot()).data.topics.map(t=>[t.name,t.priority,t.sortOrder]),[['Low first','Low',0],['Closures','High',1],['High second','High',2]]);
+  await assert.rejects(save(s.revision,{topics:{upsert:[{...c.topics.upsert[0],priority:'Urgent'}],delete:[]}}),/check constraint/);
+  assert.equal((await snapshot()).revision,s.revision);
+  await asUser(b);assert.deepEqual((await snapshot()).data.topics,[]);
+  assert.equal((await db.query('select id from public.topics where id=$1',[topic])).rows.length,0);
+  assert.equal((await db.query("update public.topics set priority='Low' where id=$1 returning id",[topic])).rows.length,0);
+  assert.equal((await db.query('delete from public.topics where id=$1 returning id',[topic])).rows.length,0);
+  await assert.rejects(db.query('insert into public.topics(user_id,skill_id,name,priority) values($1,$2,$3,$4)',[a,skill,'Forbidden import','High']),/row-level security/);
+  await asUser(a);assert.equal((await snapshot()).data.topics.length,3);
+});

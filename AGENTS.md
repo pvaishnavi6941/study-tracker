@@ -2,6 +2,8 @@
 
 Cadence uses Supabase Auth and PostgreSQL as the source of truth. Preserve the existing liquid-glass design. Never seed production study data or expose secret/service-role keys. Keep original browser study data untouched; cloud migration must be explicitly confirmed. Use owner RLS and composite foreign keys for all user-owned rows, and atomic revision-checked writes for related changes.
 
+Excel topic imports use the unchanged official workbook in public/Cadence_Blank_Topic_Template.xlsx. Read only its Topics sheet with exactly Topic and Priority columns. Assign the skill in Cadence, validate the entire file before an atomic save, reject duplicates within that skill, and preserve High/Medium/Low priority and source order. Never assign topic durations. Today’s Focus selects incomplete topics by priority/order; completion is an explicit user action and study time records actual duration.
+
 Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
 
 Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.

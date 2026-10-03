@@ -2,6 +2,7 @@
 import { vi } from "vitest";
 import { emptyData, Data } from "./model";
 const initial = () => ({
+  topicImportReady: true,
   revision: 0,
   profile: { id: "test-user-a", displayName: "User A", avatarUrl: null },
   data: emptyData(),
@@ -22,6 +23,7 @@ export const save = vi.fn(
   async (userId: string, previous: { revision: number }, next: Data) => {
     if (testCloud.saveError) throw testCloud.saveError;
     testCloud.snapshot = {
+      topicImportReady: true,
       revision: previous.revision + 1,
       profile: { ...testCloud.snapshot.profile, id: userId },
       data: structuredClone(next),

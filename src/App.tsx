@@ -32,6 +32,7 @@ import {
   hoursLabel,
   sumMinutes,
   isTopicComplete,
+  incompleteTopics,
   skillStats,
   streakStats,
   chartBuckets,
@@ -44,6 +45,8 @@ import { useStudyData, readLegacyData } from "./store";
 import { useAuth } from "./auth/AuthProvider";
 import { AccountPanel } from "./auth/AccountPanel";
 import { prepareImport } from "./utils/import-data";
+import { TopicImport, TemplateHelp } from "./TopicImport";
+import { TopicFocus } from "./TopicFocus";
 import {
   Card,
   Empty,
@@ -73,6 +76,7 @@ type Page =
   | "Analytics"
   | "Settings";
 type Dialog =
+  | { kind: "topic-import"; skillId?: string }
   | {
       kind: "setup";
     }
@@ -142,7 +146,7 @@ const newDraft = (skillId = ""): SessionDraft => ({
   date: dayKey(),
   time: new Date().toTimeString().slice(0, 5),
   notes: "",
-  completed: true,
+  completed: false,
 });
 function download(content: string, name: string) {
   const url = URL.createObjectURL(
@@ -166,6 +170,7 @@ export function App({ userId }: { userId: string }) {
     loading,
     saving,
     refresh,
+    topicImportReady,
   } = useStudyData(userId);
   const auth = useAuth();
   const [legacy] = useState(readLegacyData);
@@ -267,8 +272,13 @@ export function App({ userId }: { userId: string }) {
     totalMinutes = sumMinutes(data.sessions),
     totalHoursTarget = data.skills.reduce((sum, s) => sum + s.targetHours, 0);
   const todaysPlans = data.plans.filter((p) => p.date === today),
-    pendingPlans = todaysPlans.filter((p) => !p.sessionId),
+    pendingPlans = todaysPlans.filter(
+      (p) =>
+        !p.sessionId &&
+        !isTopicComplete(data, data.topics.find((t) => t.id === p.topicId)!),
+    ),
     plannedMinutes = pendingPlans.reduce((sum, p) => sum + p.minutes, 0);
+  const focusTopics = incompleteTopics(data).slice(0, 3);
   const weekStart = shiftDay(today, -new Date(`${today}T12:00:00`).getDay());
   const weekPoints = Array.from(
     {
@@ -711,52 +721,63 @@ export function App({ userId }: { userId: string }) {
                 </div>
                 <div className="up-next inset">
                   <span className="eyebrow">UP NEXT</span>
-                  {pendingPlans[0] ? (
+                  {focusTopics[0] ? (
                     (() => {
-                      const p = pendingPlans[0],
-                        t = data.topics.find((t) => t.id === p.topicId)!,
-                        s = data.skills.find((s) => s.id === t.skillId)!;
+                      const topic = focusTopics[0],
+                        skill = data.skills.find(
+                          (s) => s.id === topic.skillId,
+                        )!;
                       return (
                         <>
                           <div className="skill-line">
                             <span
                               className="dot"
-                              style={{
-                                background: s.color,
-                              }}
+                              style={{ background: skill.color }}
                             />
-                            {s.name}
+                            {skill.name}
                             <span className="badge">
-                              {minutesLabel(p.minutes)}
+                              {topic.priority || "Medium"}
                             </span>
                           </div>
-                          <h2>{t.name}</h2>
-                          <p>One focused session. A little more momentum.</p>
+                          <h2>{topic.name}</h2>
+                          <p>
+                            Study at your own pace. Save the time you actually
+                            spend.
+                          </p>
                           <button
                             className="primary"
-                            onClick={() => startPlan(p)}
+                            onClick={() =>
+                              start(topic.skillId, topic.id, topic.name)
+                            }
                           >
                             <Play weight="fill" size={17} />
-                            Start {minutesLabel(p.minutes)} session
+                            Start session
                           </button>
                           <p className="next-hint">
-                            {pendingPlans.length > 1
-                              ? `Then ${data.topics.find((t) => t.id === pendingPlans[1].topicId)?.name} · ${minutesLabel(pendingPlans[1].minutes)}`
-                              : "Your next step starts here."}
+                            {focusTopics[1]
+                              ? "Then " + focusTopics[1].name
+                              : "One topic, one step forward."}
                           </p>
                         </>
                       );
                     })()
                   ) : (
                     <Empty
-                      title="A fresh start awaits"
-                      description="Choose a topic and set aside some time to focus."
+                      title={
+                        data.topics.length
+                          ? "All topics complete"
+                          : "A fresh start awaits"
+                      }
+                      description="Add or import topics to choose your next step."
                       action={
-                        <button className="primary" onClick={planStudy}>
-                          <Plus size={18} />
-                          {data.topics.length
-                            ? "Plan today’s study"
-                            : "Add your first skill"}
+                        <button
+                          className="primary"
+                          onClick={() => {
+                            go("Skills");
+                            setDialog({ kind: "topic-import" });
+                          }}
+                        >
+                          Import Topics
                         </button>
                       }
                     />
@@ -767,11 +788,28 @@ export function App({ userId }: { userId: string }) {
                 <Card>
                   <div className="card-heading">
                     <h2>Today’s Focus</h2>
-                    <span>{minutesLabel(plannedMinutes)} still planned</span>
+                    <span>{focusTopics.length} topics ready</span>
                   </div>
-                  {todaysPlans.length ? (
+                  <TopicFocus
+                    data={data}
+                    topics={focusTopics}
+                    onStart={(topic) => {
+                      void start(topic.skillId, topic.id, topic.name);
+                    }}
+                    onLog={(topic) => {
+                      setDraft({
+                        ...newDraft(topic.skillId),
+                        topicId: topic.id,
+                        topic: topic.name,
+                        completed: false,
+                      });
+                      go("Log");
+                    }}
+                    onPlan={planStudy}
+                  />
+                  {pendingPlans.length ? (
                     <div className="focus-list">
-                      {todaysPlans.map((p, i) => {
+                      {pendingPlans.map((p, i) => {
                         const t = data.topics.find((t) => t.id === p.topicId)!;
                         const s = data.skills.find((s) => s.id === t.skillId)!;
                         return (
@@ -851,18 +889,7 @@ export function App({ userId }: { userId: string }) {
                         Plan another focus block
                       </button>
                     </div>
-                  ) : (
-                    <Empty
-                      title="Nothing planned yet"
-                      description="Give your day a little direction with a focused study block."
-                      action={
-                        <button className="secondary" onClick={planStudy}>
-                          Plan today’s study
-                          <ArrowRight size={17} />
-                        </button>
-                      }
-                    />
-                  )}
+                  ) : null}
                 </Card>
                 <Card className="dashboard-streak">
                   <span className="eyebrow">CURRENT STREAK</span>
@@ -986,6 +1013,19 @@ export function App({ userId }: { userId: string }) {
           )}
           {page === "Skills" && (
             <>
+              <Card className="topic-import-tools">
+                <div className="card-heading">
+                  <h2>Build your topic list</h2>
+                  <button
+                    className="primary small"
+                    onClick={() => setDialog({ kind: "topic-import" })}
+                  >
+                    <UploadSimple size={17} />
+                    Import Topics
+                  </button>
+                </div>
+                <TemplateHelp />
+              </Card>
               {data.skills.length ? (
                 <div className="skills-grid">
                   {data.skills.map((skill) => {
@@ -1948,19 +1988,21 @@ export function App({ userId }: { userId: string }) {
         {dialog && (
           <Modal
             title={
-              dialog.kind === "setup"
-                ? "Find your learning rhythm"
-                : dialog.kind === "skill"
-                  ? dialog.skill
-                    ? "Edit skill"
-                    : "Add a skill"
-                  : dialog.kind === "topics"
-                    ? dialog.skill.name
-                    : dialog.kind === "plan"
-                      ? "Plan your study"
-                      : dialog.kind === "finish"
-                        ? "Finish your session"
-                        : dialog.title
+              dialog.kind === "topic-import"
+                ? "Import topics"
+                : dialog.kind === "setup"
+                  ? "Find your learning rhythm"
+                  : dialog.kind === "skill"
+                    ? dialog.skill
+                      ? "Edit skill"
+                      : "Add a skill"
+                    : dialog.kind === "topics"
+                      ? dialog.skill.name
+                      : dialog.kind === "plan"
+                        ? "Plan your study"
+                        : dialog.kind === "finish"
+                          ? "Finish your session"
+                          : dialog.title
             }
             onClose={async () => {
               if (saving) return;
@@ -1987,6 +2029,22 @@ export function App({ userId }: { userId: string }) {
               <p role="status" className="sync-notice">
                 Saving to your account…
               </p>
+            )}
+            {dialog.kind === "topic-import" && (
+              <TopicImport
+                data={data}
+                initialSkillId={dialog.skillId}
+                ready={topicImportReady}
+                update={update}
+                onCancel={() => setDialog(null)}
+                onDone={(skillId, count) => {
+                  setDialog(null);
+                  go("Skills");
+                  notify(
+                    count + " topics imported. Your focus queue is ready.",
+                  );
+                }}
+              />
             )}
             {dialog.kind === "setup" && (
               <Setup
@@ -2103,6 +2161,9 @@ export function App({ userId }: { userId: string }) {
                 update={update}
                 notify={notify}
                 ask={ask}
+                onImport={() =>
+                  setDialog({ kind: "topic-import", skillId: dialog.skill.id })
+                }
                 onPlan={() =>
                   setDialog({
                     kind: "plan",
