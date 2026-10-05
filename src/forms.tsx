@@ -8,6 +8,9 @@ import {
   SUGGESTIONS,
   uid,
   isTopicComplete,
+  parseDuration,
+  minutesLabel,
+  videoProgress,
 } from "./model";
 import { Empty } from "./components";
 export function Setup({
@@ -124,18 +127,33 @@ export function SkillForm({
   color: string;
   onSave: (skill: Skill, topics: string[]) => void;
 }) {
-  const [chosen, setChosen] = useState(skill?.color || color);
+  const [chosen, setChosen] = useState(skill?.color || color),
+    [problem, setProblem] = useState("");
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        const lengthText = String(fd.get("video") || "").trim(),
+          videoMinutes = lengthText ? parseDuration(lengthText) : null;
+        if (lengthText && (!videoMinutes || videoMinutes > 600000)) {
+          setProblem("Enter the video length like 12:30, 12h 30m or 750.");
+          return;
+        }
+        setProblem("");
+        const position = Math.min(
+          videoMinutes || 0,
+          skill?.videoPosition || 0,
+        );
         onSave(
           {
             id: skill?.id || uid(),
             name: String(fd.get("name")).trim(),
             targetHours: Number(fd.get("hours")),
             color: chosen,
+            ...(videoMinutes
+              ? { videoMinutes, videoPosition: position }
+              : { videoMinutes: null, videoPosition: 0 }),
             createdAt: skill?.createdAt || new Date().toISOString(),
           },
           [
@@ -177,6 +195,27 @@ export function SkillForm({
       <p className="footnote">
         Set 0 if you prefer to track topics without an hours target.
       </p>
+      <label className="field-label" htmlFor="skill-video">
+        VIDEO COURSE LENGTH (OPTIONAL)
+      </label>
+      <input
+        id="skill-video"
+        name="video"
+        autoComplete="off"
+        placeholder="e.g. 12:30 or 12h 30m"
+        defaultValue={
+          skill?.videoMinutes ? minutesLabel(skill.videoMinutes) : ""
+        }
+      />
+      <p className="footnote">
+        Learning from a video? Enter its total length and track progress by
+        where you stop watching, instead of topics.
+      </p>
+      {problem && (
+        <p className="form-error" role="alert">
+          {problem}
+        </p>
+      )}
       <label className="field-label" htmlFor="skill-color">
         SKILL COLOR
       </label>
@@ -220,6 +259,56 @@ export function SkillForm({
       <button className="primary full">
         {skill ? "Save skill" : "Add skill"}
       </button>
+    </form>
+  );
+}
+/** Update where the learner stopped in a video course. Accepts 1:30, 1h 30m or minutes. */
+export function VideoPositionForm({
+  skill,
+  onSave,
+}: {
+  skill: Skill;
+  onSave: (position: number) => void;
+}) {
+  const v = videoProgress(skill),
+    [problem, setProblem] = useState("");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const position = parseDuration(
+          String(new FormData(e.currentTarget).get("position")),
+        );
+        if (position === null || position > v.total) {
+          setProblem(
+            `Enter a time between 0 and ${minutesLabel(v.total)}, like 3:20 or 3h 20m.`,
+          );
+          return;
+        }
+        onSave(position);
+      }}
+    >
+      <p>
+        {skill.name} · {minutesLabel(v.position)} of {minutesLabel(v.total)}{" "}
+        watched ({v.percent}%)
+      </p>
+      <label className="field-label" htmlFor="video-position">
+        WHERE DID YOU STOP IN THE VIDEO?
+      </label>
+      <input
+        id="video-position"
+        name="position"
+        autoComplete="off"
+        required
+        placeholder="e.g. 3:20 or 3h 20m"
+        defaultValue={v.position ? minutesLabel(v.position) : ""}
+      />
+      {problem && (
+        <p className="form-error" role="alert">
+          {problem}
+        </p>
+      )}
+      <button className="primary full">Save progress</button>
     </form>
   );
 }
@@ -614,18 +703,40 @@ export function formatSeconds(value: number) {
 export function FinishSession({
   seconds,
   topic,
+  video,
   onSave,
 }: {
   seconds: number;
   topic: string;
-  onSave: (notes: string, complete: boolean) => void;
+  video?: Skill;
+  onSave: (notes: string, complete: boolean, videoPosition?: number) => void;
 }) {
+  const [problem, setProblem] = useState("");
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
-        onSave(String(f.get("notes") || ""), f.get("complete") === "on");
+        let position: number | undefined;
+        if (video) {
+          const text = String(f.get("position") || "").trim();
+          if (text) {
+            const parsed = parseDuration(text);
+            if (parsed === null || parsed > videoProgress(video).total) {
+              setProblem(
+                `Enter a time between 0 and ${minutesLabel(video.videoMinutes || 0)}, like 3:20.`,
+              );
+              return;
+            }
+            position = parsed;
+          }
+        }
+        setProblem("");
+        onSave(
+          String(f.get("notes") || ""),
+          f.get("complete") === "on",
+          position,
+        );
       }}
     >
       <p>{topic}</p>
@@ -634,6 +745,24 @@ export function FinishSession({
         Your actual elapsed time will be saved to the date this session started.
         The timer keeps running until you save or pause it.
       </p>
+      {video && (
+        <>
+          <label className="field-label" htmlFor="finish-position">
+            STOPPED AT IN VIDEO (OPTIONAL)
+          </label>
+          <input
+            id="finish-position"
+            name="position"
+            autoComplete="off"
+            placeholder={`Now at ${minutesLabel(videoProgress(video).position)} of ${minutesLabel(videoProgress(video).total)}`}
+          />
+          {problem && (
+            <p className="form-error" role="alert">
+              {problem}
+            </p>
+          )}
+        </>
+      )}
       <label className="field-label" htmlFor="finish-notes">
         NOTES
       </label>

@@ -34,6 +34,8 @@ import {
   isTopicComplete,
   incompleteTopics,
   skillStats,
+  isVideoSkill,
+  videoProgress,
   streakStats,
   chartBuckets,
   progressHistory,
@@ -63,6 +65,7 @@ import {
   PlanForm,
   Confirm,
   FinishSession,
+  VideoPositionForm,
   formatSeconds,
 } from "./forms";
 import { SessionRow, History, Heatmap } from "./history";
@@ -97,6 +100,10 @@ type Dialog =
       description: string;
       action: () => boolean | Promise<boolean>;
       strong?: boolean;
+    }
+  | {
+      kind: "video";
+      skill: Skill;
     }
   | {
       kind: "finish";
@@ -1051,7 +1058,9 @@ export function App({ userId }: { userId: string }) {
                         <div className="skill-progress">
                           <strong>{s.progress}%</strong>
                           <span>
-                            {s.completed} of {s.topics.length} topics
+                            {isVideoSkill(skill)
+                              ? `${minutesLabel(videoProgress(skill).position)} of ${minutesLabel(videoProgress(skill).total)} watched`
+                              : `${s.completed} of ${s.topics.length} topics`}
                           </span>
                         </div>
                         <Progress value={s.progress} color={skill.color} />
@@ -1073,6 +1082,14 @@ export function App({ userId }: { userId: string }) {
                         >
                           Log a session
                         </button>
+                        {isVideoSkill(skill) && (
+                          <button
+                            className="secondary full"
+                            onClick={() => setDialog({ kind: "video", skill })}
+                          >
+                            Update video progress
+                          </button>
+                        )}
                         <div className="skill-tools">
                           <button
                             className="text-button"
@@ -1998,7 +2015,9 @@ export function App({ userId }: { userId: string }) {
                       : "Add a skill"
                     : dialog.kind === "topics"
                       ? dialog.skill.name
-                      : dialog.kind === "plan"
+                      : dialog.kind === "video"
+                        ? "Video progress"
+                        : dialog.kind === "plan"
                         ? "Plan your study"
                         : dialog.kind === "finish"
                           ? "Finish your session"
@@ -2171,6 +2190,26 @@ export function App({ userId }: { userId: string }) {
                 }
               />
             )}
+            {dialog.kind === "video" && (
+              <VideoPositionForm
+                skill={dialog.skill}
+                onSave={async (position) => {
+                  if (
+                    await update((d) => ({
+                      ...d,
+                      skills: d.skills.map((x) =>
+                        x.id === dialog.skill.id
+                          ? { ...x, videoPosition: position }
+                          : x,
+                      ),
+                    }))
+                  ) {
+                    setDialog(null);
+                    notify("Video progress saved.");
+                  }
+                }}
+              />
+            )}
             {dialog.kind === "plan" && (
               <PlanForm
                 data={data}
@@ -2219,7 +2258,13 @@ export function App({ userId }: { userId: string }) {
               <FinishSession
                 seconds={timerSeconds(data.timer, now)}
                 topic={data.timer.topic}
-                onSave={async (notes, completed) => {
+                video={(() => {
+                  const sk = data.skills.find(
+                    (x) => x.id === data.timer!.skillId,
+                  );
+                  return sk && isVideoSkill(sk) ? sk : undefined;
+                })()}
+                onSave={async (notes, completed, videoPosition) => {
                   const timer = data.timer!;
                   const seconds = timerSeconds(timer);
                   if (seconds < 1) {
@@ -2279,6 +2324,14 @@ export function App({ userId }: { userId: string }) {
                       return {
                         ...d,
                         topics,
+                        skills:
+                          videoPosition === undefined
+                            ? d.skills
+                            : d.skills.map((x) =>
+                                x.id === s.skillId
+                                  ? { ...x, videoPosition }
+                                  : x,
+                              ),
                         sessions: [...d.sessions, s],
                         timer: null,
                         plans: d.plans.map((p) =>

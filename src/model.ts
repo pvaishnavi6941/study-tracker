@@ -3,6 +3,10 @@ export type Skill = {
   name: string;
   color: string;
   targetHours: number;
+  /** Total length of the video course in minutes; null/undefined = topic-based skill. */
+  videoMinutes?: number | null;
+  /** Minutes of the video watched so far (where the learner stopped). */
+  videoPosition?: number;
   createdAt: string;
 };
 export type Topic = {
@@ -182,9 +186,30 @@ export function streakStats(data: Data, today = dayKey()) {
     best: Math.max(0, ...totals.values()),
   };
 }
+export const isVideoSkill = (skill: Skill) => !!skill.videoMinutes;
+export function videoProgress(skill: Skill) {
+  const total = skill.videoMinutes || 0,
+    position = Math.min(total, skill.videoPosition || 0);
+  return {
+    total,
+    position,
+    remaining: Math.max(0, total - position),
+    percent: total ? Math.round((position / total) * 100) : 0,
+  };
+}
+/** Parse "1:30", "90", "1h 30m" or "1h" into minutes; null when unreadable. */
+export function parseDuration(text: string): number | null {
+  const t = text.trim().toLowerCase();
+  let m = t.match(/^(\d+):([0-5]?\d)(?::[0-5]?\d)?$/);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  m = t.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m?)?$/);
+  if (!m || (m[1] === undefined && m[2] === undefined)) return null;
+  return Number(m[1] || 0) * 60 + Number(m[2] || 0);
+}
 export function skillStats(data: Data, skill: Skill, today = dayKey()) {
   const topics = data.topics.filter((t) => t.skillId === skill.id),
     sessions = data.sessions.filter((s) => s.skillId === skill.id),
+    video = isVideoSkill(skill),
     completed = topics.filter((t) => isTopicComplete(data, t)).length;
   const last = sessions
     .map((s) => s.date)
@@ -201,7 +226,11 @@ export function skillStats(data: Data, skill: Skill, today = dayKey()) {
     topics,
     sessions,
     completed,
-    progress: topics.length ? Math.round((completed / topics.length) * 100) : 0,
+    progress: video
+      ? videoProgress(skill).percent
+      : topics.length
+        ? Math.round((completed / topics.length) * 100)
+        : 0,
     minutes: sumMinutes(sessions),
     last,
     lastLabel:
@@ -216,7 +245,9 @@ export function skillStats(data: Data, skill: Skill, today = dayKey()) {
       ? "Ready to begin"
       : daysAgo !== null && daysAgo >= 10
         ? "Needs revisit"
-        : topics.length && completed === topics.length
+        : (video
+              ? videoProgress(skill).percent === 100
+              : topics.length && completed === topics.length)
           ? "Complete"
           : "Building",
   };
@@ -353,6 +384,12 @@ export function validateData(raw: unknown): Data {
         s.name.trim() &&
         /^#[0-9a-f]{6}$/i.test(s.color) &&
         num(s.targetHours) &&
+        (s.videoMinutes === undefined ||
+          s.videoMinutes === null ||
+          (num(s.videoMinutes, 600000) && s.videoMinutes > 0)) &&
+        (s.videoPosition === undefined ||
+          (num(s.videoPosition, 600000) &&
+            (!s.videoMinutes || s.videoPosition <= s.videoMinutes))) &&
         timestamp(s.createdAt),
     )
   )

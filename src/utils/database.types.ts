@@ -32,7 +32,13 @@ export type Database = {
         updated_at: string;
       }>;
       skills: Table<
-        Owned & { name: string; color: string; target_hours: number }
+        Owned & {
+          name: string;
+          color: string;
+          target_hours: number;
+          video_minutes: number | null;
+          video_position: number;
+        }
       >;
       topics: Table<
         Owned & {

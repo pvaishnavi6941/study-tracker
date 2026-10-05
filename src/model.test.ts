@@ -10,6 +10,8 @@ import {
   progressHistory,
   validateData,
   timerSeconds,
+  parseDuration,
+  videoProgress,
   Session,
   Data,
 } from "./model";
@@ -227,5 +229,43 @@ describe("backups", () => {
         ],
       }),
     ).toThrow();
+  });
+});
+
+describe("video course progress", () => {
+  it("parses common duration formats", () => {
+    expect(parseDuration("1:30")).toBe(90);
+    expect(parseDuration("12h 30m")).toBe(750);
+    expect(parseDuration("2h")).toBe(120);
+    expect(parseDuration("45")).toBe(45);
+    expect(parseDuration("abc")).toBeNull();
+    expect(parseDuration("")).toBeNull();
+  });
+  it("measures progress by video position, not topics or study time", () => {
+    const data = makeData(),
+      base = data.skills[0];
+    data.skills[0] = { ...base, videoMinutes: 600, videoPosition: 150 };
+    data.sessions.push({
+      id: "v1",
+      skillId: base.id,
+      topicId: null,
+      topic: "Java video",
+      minutes: 400,
+      date: today,
+      time: "09:00",
+      notes: "",
+      completed: false,
+      createdAt: "2026-10-03T09:00:00.000Z",
+    });
+    const stats = skillStats(data, data.skills[0], today);
+    expect(stats.progress).toBe(25);
+    expect(stats.minutes).toBe(400);
+    expect(videoProgress(data.skills[0]).remaining).toBe(450);
+    expect(() => validateData(data)).not.toThrow();
+  });
+  it("rejects a position past the video length", () => {
+    const data = makeData();
+    data.skills[0] = { ...data.skills[0], videoMinutes: 60, videoPosition: 61 };
+    expect(() => validateData(data)).toThrow();
   });
 });
