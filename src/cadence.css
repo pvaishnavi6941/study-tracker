@@ -34,6 +34,20 @@ dialog{margin:auto}input[type=file]::file-selector-button{font:inherit;color:inh
 @media(max-width:760px){.brand img{width:64px;height:64px;margin:-13px -7px -13px -13px}}
 
 /* Keep mobile navigation and session controls clear of the home indicator. */
+.session-topic{display:block;border:0;background:transparent;color:inherit;padding:0;text-align:left;font-size:13px;font-weight:650;line-height:1.4;overflow-wrap:anywhere}
+.session-row:has(.session-topic){position:relative}
+.session-topic::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:1;cursor:pointer}
+.session-topic:hover:not(:disabled),.session-topic:active:not(:disabled){filter:none;transform:none}
+.session-row:has(.session-topic):hover{border-color:#a9d6e66b}
+.session-topic:focus-visible{outline:none}
+.session-topic:focus-visible::after{outline:2px solid #9beedf;outline-offset:4px;border-radius:18px}
+.session-row:has(.session-topic)>.icon-button{position:relative;z-index:2}
+.session-detail{padding:22px}.session-detail h3{font-size:22px;overflow-wrap:anywhere;margin-bottom:12px}
+.session-detail-skill{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.session-detail-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0 24px;font-size:13px}
+.session-detail-notes{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:10px;font-size:14px}
+.session-viewer-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px}
+.session-viewer-controls>span{color:var(--muted);font-size:13px}
 @media (max-width: 760px) {
   .app-shell {
     --mobile-nav-top: calc(84px + env(safe-area-inset-bottom, 0px));

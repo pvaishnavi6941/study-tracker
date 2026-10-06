@@ -1,15 +1,25 @@
-import { Check, PencilSimple, Trash } from "@phosphor-icons/react";
+import { useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  PencilSimple,
+  Trash,
+} from "@phosphor-icons/react";
 import { Data, Session, shiftDay, minutesLabel, sumMinutes } from "./model";
+import { Modal } from "./components";
 export function SessionRow({
   session: s,
   data,
   onEdit,
   onDelete,
+  onView,
 }: {
   session: Session;
   data: Data;
   onEdit: () => void;
   onDelete: () => void;
+  onView?: () => void;
 }) {
   const skill = data.skills.find((x) => x.id === s.skillId);
   return (
@@ -21,12 +31,22 @@ export function SessionRow({
         {s.completed && <Check size={16} />}
       </span>
       <div className="row-copy">
-        <strong>{s.topic}</strong>
+        {onView ? (
+          <button
+            className="session-topic"
+            onClick={onView}
+            aria-label={`View session ${s.topic}`}
+          >
+            {s.topic}
+          </button>
+        ) : (
+          <strong>{s.topic}</strong>
+        )}
         <p>
           <span className="dot" style={{ background: skill?.color }} />
           {skill?.name} · {s.time}
         </p>
-        {s.notes && <em>{s.notes}</em>}
+        {!onView && s.notes && <em>{s.notes}</em>}
       </div>
       <strong
         className="session-duration"
@@ -66,19 +86,24 @@ export function History({
   onEdit: (s: Session) => void;
   onDelete: (s: Session) => void;
 }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const ordered = [...data.sessions].sort((a, b) =>
+    `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`),
+  );
+  const selectedIndex = ordered.findIndex((s) => s.id === selectedId);
+  const selected = ordered[selectedIndex];
+  const selectedSkill = data.skills.find((s) => s.id === selected?.skillId);
   const groups = new Map<string, Session[]>();
-  [...data.sessions]
-    .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`))
-    .forEach((s) => {
-      const key =
-        mode === "Daily"
-          ? s.date
-          : shiftDay(
-              s.date,
-              -((new Date(`${s.date}T12:00:00`).getDay() + 6) % 7),
-            );
-      groups.set(key, [...(groups.get(key) || []), s]);
-    });
+  ordered.forEach((s) => {
+    const key =
+      mode === "Daily"
+        ? s.date
+        : shiftDay(
+            s.date,
+            -((new Date(`${s.date}T12:00:00`).getDay() + 6) % 7),
+          );
+    groups.set(key, [...(groups.get(key) || []), s]);
+  });
   return (
     <div className="history-list">
       {[...groups].map(([date, sessions]) => (
@@ -114,10 +139,94 @@ export function History({
               data={data}
               onEdit={() => onEdit(s)}
               onDelete={() => onDelete(s)}
+              onView={() => setSelectedId(s.id)}
             />
           ))}
         </div>
       ))}
+      {selected && (
+        <Modal title="Study entry" onClose={() => setSelectedId(null)}>
+          <div
+            className="session-viewer"
+            onKeyDown={(event) => {
+              if (event.altKey || event.ctrlKey || event.metaKey) return;
+              if (event.key === "ArrowLeft" && selectedIndex > 0) {
+                event.preventDefault();
+                setSelectedId(ordered[selectedIndex - 1].id);
+              } else if (
+                event.key === "ArrowRight" &&
+                selectedIndex < ordered.length - 1
+              ) {
+                event.preventDefault();
+                setSelectedId(ordered[selectedIndex + 1].id);
+              }
+            }}
+          >
+            <article
+              className="session-detail inset"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <h3>{selected.topic}</h3>
+              <p className="session-detail-skill">
+                <span
+                  className="dot"
+                  style={{ background: selectedSkill?.color }}
+                />
+                {selectedSkill?.name}
+              </p>
+              <p>
+                {new Date(`${selected.date}T12:00:00`).toLocaleDateString(
+                  undefined,
+                  {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  },
+                )}{" "}
+                · {selected.time}
+              </p>
+              <div className="session-detail-meta">
+                <strong>
+                  {selected.minutes < 1
+                    ? `${Math.round(selected.minutes * 60)}s`
+                    : minutesLabel(selected.minutes)}{" "}
+                  studied
+                </strong>
+                <span className="badge">
+                  {selected.completed ? "Topic complete" : "Topic pending"}
+                </span>
+              </div>
+              <span className="eyebrow">NOTES</span>
+              <p className="session-detail-notes">
+                {selected.notes || "No notes for this session."}
+              </p>
+            </article>
+            <div className="session-viewer-controls">
+              <button
+                className="icon-button"
+                aria-label="Previous topic"
+                disabled={selectedIndex === 0}
+                onClick={() => setSelectedId(ordered[selectedIndex - 1].id)}
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <span>
+                {selectedIndex + 1} of {ordered.length}
+              </span>
+              <button
+                className="icon-button"
+                aria-label="Next topic"
+                disabled={selectedIndex === ordered.length - 1}
+                onClick={() => setSelectedId(ordered[selectedIndex + 1].id)}
+              >
+                <ArrowRight size={20} />
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
