@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   emptyData,
+  focusTopics,
   dayKey,
   shiftDay,
   streakStats,
@@ -267,5 +268,18 @@ describe("video course progress", () => {
     const data = makeData();
     data.skills[0] = { ...data.skills[0], videoMinutes: 60, videoPosition: 61 };
     expect(() => validateData(data)).toThrow();
+  });
+});
+
+describe("today's focus", () => {
+  it("includes the best topic of each skill before a second topic of one skill", () => {
+    const data = emptyData();
+    const mk = (id: string, name: string) => ({ id, name, color: "#ffffff", targetHours: 10, createdAt: new Date().toISOString() });
+    data.skills = [mk("a", "HTML"), mk("b", "DSA")];
+    const topic = (id: string, skillId: string, priority: "High" | "Low", sortOrder: number) => ({
+      id, skillId, name: id, createdAt: new Date().toISOString(), completedAt: null, priority, sortOrder,
+    });
+    data.topics = [topic("h1", "a", "High", 0), topic("h2", "a", "High", 1), topic("h3", "a", "High", 2), topic("d1", "b", "Low", 0)];
+    expect(focusTopics(data).map((t) => t.id)).toEqual(["h1", "d1", "h2"]);
   });
 });

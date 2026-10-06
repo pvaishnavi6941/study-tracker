@@ -32,7 +32,7 @@ import {
   hoursLabel,
   sumMinutes,
   isTopicComplete,
-  incompleteTopics,
+  focusTopics as todaysFocus,
   skillStats,
   isVideoSkill,
   videoProgress,
@@ -198,6 +198,7 @@ export function App({ userId }: { userId: string }) {
   const [page, setPage] = useState<Page>(initialPage),
     [dialog, setDialog] = useState<Dialog | null>(null),
     [draft, setDraft] = useState<SessionDraft>(() => newDraft()),
+    [focusSkillId, setFocusSkillId] = useState<string | null>(null),
     [mode, setMode] = useState<"Daily" | "Weekly" | "Monthly">("Daily"),
     [historyMode, setHistoryMode] = useState<"Daily" | "Weekly">("Daily"),
     [now, setNow] = useState(Date.now()),
@@ -285,7 +286,15 @@ export function App({ userId }: { userId: string }) {
         !isTopicComplete(data, data.topics.find((t) => t.id === p.topicId)!),
     ),
     plannedMinutes = pendingPlans.reduce((sum, p) => sum + p.minutes, 0);
-  const focusTopics = incompleteTopics(data).slice(0, 3);
+  const focusSkill = data.skills.find((s) => s.id === focusSkillId),
+    focusTopics = todaysFocus(
+      focusSkill
+        ? {
+            ...data,
+            topics: data.topics.filter((t) => t.skillId === focusSkill.id),
+          }
+        : data,
+    );
   const weekStart = shiftDay(today, -new Date(`${today}T12:00:00`).getDay());
   const weekPoints = Array.from(
     {
@@ -748,8 +757,9 @@ export function App({ userId }: { userId: string }) {
                           </div>
                           <h2>{topic.name}</h2>
                           <p>
-                            Study at your own pace. Save the time you actually
-                            spend.
+                            {topic.stoppedAt
+                              ? `Resume at ${minutesLabel(topic.stoppedAt)} in the video.`
+                              : "Study at your own pace. Save the time you actually spend."}
                           </p>
                           <button
                             className="primary"
@@ -797,6 +807,45 @@ export function App({ userId }: { userId: string }) {
                     <h2>Today’s Focus</h2>
                     <span>{focusTopics.length} topics ready</span>
                   </div>
+                  {data.skills.length > 1 && (
+                    <div
+                      role="group"
+                      aria-label="Filter Today’s Focus by skill"
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginBottom: 16,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`chip ${focusSkill ? "" : "chosen"}`}
+                        aria-pressed={!focusSkill}
+                        style={{ minHeight: 32, padding: "6px 12px" }}
+                        onClick={() => setFocusSkillId(null)}
+                      >
+                        All
+                      </button>
+                      {data.skills.map((s) => (
+                        <button
+                          type="button"
+                          key={s.id}
+                          className={`chip ${focusSkill?.id === s.id ? "chosen" : ""}`}
+                          aria-pressed={focusSkill?.id === s.id}
+                          style={{ minHeight: 32, padding: "6px 12px" }}
+                          onClick={() =>
+                            setFocusSkillId(
+                              focusSkill?.id === s.id ? null : s.id,
+                            )
+                          }
+                        >
+                          <span className="dot" style={{ background: s.color }} />
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <TopicFocus
                     data={data}
                     topics={focusTopics}
@@ -1085,6 +1134,7 @@ export function App({ userId }: { userId: string }) {
                         {isVideoSkill(skill) && (
                           <button
                             className="secondary full"
+                            style={{ marginTop: 10 }}
                             onClick={() => setDialog({ kind: "video", skill })}
                           >
                             Update video progress
@@ -2258,13 +2308,23 @@ export function App({ userId }: { userId: string }) {
               <FinishSession
                 seconds={timerSeconds(data.timer, now)}
                 topic={data.timer.topic}
+                trackStop={(() => {
+                  const sk = data.skills.find(
+                    (x) => x.id === data.timer!.skillId,
+                  );
+                  return !!sk && !isVideoSkill(sk);
+                })()}
+                resumeAt={
+                  data.topics.find((t) => t.id === data.timer!.topicId)
+                    ?.stoppedAt
+                }
                 video={(() => {
                   const sk = data.skills.find(
                     (x) => x.id === data.timer!.skillId,
                   );
                   return sk && isVideoSkill(sk) ? sk : undefined;
                 })()}
-                onSave={async (notes, completed, videoPosition) => {
+                onSave={async (notes, completed, videoPosition, stoppedAt) => {
                   const timer = data.timer!;
                   const seconds = timerSeconds(timer);
                   if (seconds < 1) {
@@ -2321,6 +2381,10 @@ export function App({ userId }: { userId: string }) {
                             p.date === s.date &&
                             !p.sessionId,
                         )?.id;
+                      if (stoppedAt !== undefined)
+                        topics = topics.map((t) =>
+                          t.id === s.topicId ? { ...t, stoppedAt } : t,
+                        );
                       return {
                         ...d,
                         topics,

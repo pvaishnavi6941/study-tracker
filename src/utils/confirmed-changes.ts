@@ -39,6 +39,8 @@ export function changesConfirmed(
           delete (actualRow as Data["topics"][number]).priority;
         if (intended.sortOrder === undefined)
           delete (actualRow as Data["topics"][number]).sortOrder;
+        if (intended.stoppedAt === undefined)
+          delete (actualRow as Data["topics"][number]).stoppedAt;
       }
       if (!equal(row, oldRows.get(id)) && !equal(row, actualRow)) return false;
     }

@@ -308,7 +308,9 @@ export function VideoPositionForm({
           {problem}
         </p>
       )}
-      <button className="primary full">Save progress</button>
+      <button className="primary full" style={{ marginTop: 22 }}>
+        Save progress
+      </button>
     </form>
   );
 }
@@ -490,6 +492,11 @@ export function TopicManager({
                   {t.name}
                 </strong>
                 <span className="badge">{t.priority || "Medium"}</span>
+                {!done && t.stoppedAt ? (
+                  <span className="badge">
+                    Resume {minutesLabel(t.stoppedAt)}
+                  </span>
+                ) : null}
                 <button
                   className="icon-button subtle"
                   aria-label={`Edit topic ${t.name}`}
@@ -704,12 +711,23 @@ export function FinishSession({
   seconds,
   topic,
   video,
+  resumeAt,
+  trackStop,
   onSave,
 }: {
   seconds: number;
   topic: string;
   video?: Skill;
-  onSave: (notes: string, complete: boolean, videoPosition?: number) => void;
+  /** Current saved stop point of the topic, in minutes. */
+  resumeAt?: number | null;
+  /** True for topic-based skills, where each topic can be a video with its own stop point. */
+  trackStop?: boolean;
+  onSave: (
+    notes: string,
+    complete: boolean,
+    videoPosition?: number,
+    topicStoppedAt?: number,
+  ) => void;
 }) {
   const [problem, setProblem] = useState("");
   return (
@@ -731,11 +749,24 @@ export function FinishSession({
             position = parsed;
           }
         }
+        let stoppedAt: number | undefined;
+        if (trackStop) {
+          const text = String(f.get("stopped") || "").trim();
+          if (text) {
+            const parsed = parseDuration(text);
+            if (parsed === null || parsed > 600000) {
+              setProblem("Enter where you stopped like 45:10, 1h 20m or 80.");
+              return;
+            }
+            stoppedAt = parsed;
+          }
+        }
         setProblem("");
         onSave(
           String(f.get("notes") || ""),
           f.get("complete") === "on",
           position,
+          stoppedAt,
         );
       }}
     >
@@ -755,6 +786,28 @@ export function FinishSession({
             name="position"
             autoComplete="off"
             placeholder={`Now at ${minutesLabel(videoProgress(video).position)} of ${minutesLabel(videoProgress(video).total)}`}
+          />
+          {problem && (
+            <p className="form-error" role="alert">
+              {problem}
+            </p>
+          )}
+        </>
+      )}
+      {trackStop && (
+        <>
+          <label className="field-label" htmlFor="finish-stopped">
+            STOPPED AT IN VIDEO (OPTIONAL)
+          </label>
+          <input
+            id="finish-stopped"
+            name="stopped"
+            autoComplete="off"
+            placeholder={
+              resumeAt
+                ? `Last stopped at ${minutesLabel(resumeAt)}`
+                : "e.g. 45:10 or 1h 20m"
+            }
           />
           {problem && (
             <p className="form-error" role="alert">

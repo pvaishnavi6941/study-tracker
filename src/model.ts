@@ -17,6 +17,8 @@ export type Topic = {
   completedAt: string | null;
   priority?: "High" | "Medium" | "Low";
   sortOrder?: number;
+  /** Minutes into the topic's video where the learner stopped; null/undefined = not started. */
+  stoppedAt?: number | null;
 };
 export function incompleteTopics(data: Data) {
   const rank = { High: 0, Medium: 1, Low: 2 };
@@ -31,6 +33,24 @@ export function incompleteTopics(data: Data) {
         order.get(a.id)! - order.get(b.id)! ||
         Date.parse(a.createdAt) - Date.parse(b.createdAt),
     );
+}
+/**
+ * Today's Focus: the best incomplete topic of each skill first (by priority/order),
+ * then the next best of each, so one skill with many High topics cannot crowd out the rest.
+ */
+export function focusTopics(data: Data, limit = 3) {
+  const ranked = incompleteTopics(data),
+    bySkill = new Map<string, Topic[]>();
+  for (const topic of ranked)
+    bySkill.set(topic.skillId, [...(bySkill.get(topic.skillId) || []), topic]);
+  const queues = [...bySkill.values()],
+    picked: Topic[] = [];
+  for (let round = 0; picked.length < limit; round++) {
+    const row = queues.map((q) => q[round]).filter(Boolean);
+    if (!row.length) break;
+    picked.push(...row.slice(0, limit - picked.length));
+  }
+  return picked;
 }
 export type Session = {
   id: string;
@@ -408,7 +428,10 @@ export function validateData(raw: unknown): Data {
         (t.priority === undefined ||
           ["High", "Medium", "Low"].includes(t.priority)) &&
         (t.sortOrder === undefined ||
-          (Number.isSafeInteger(t.sortOrder) && num(t.sortOrder, 2147483647))),
+          (Number.isSafeInteger(t.sortOrder) && num(t.sortOrder, 2147483647))) &&
+        (t.stoppedAt === undefined ||
+          t.stoppedAt === null ||
+          num(t.stoppedAt, 600000)),
     )
   )
     return fail();

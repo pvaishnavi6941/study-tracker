@@ -48,6 +48,7 @@ export type Database = {
           completed_at: string | null;
           priority: "High" | "Medium" | "Low";
           sort_order: number;
+          stopped_at: number | null;
         }
       >;
       study_sessions: Table<

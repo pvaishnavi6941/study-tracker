@@ -1,4 +1,4 @@
-import { Data, Topic } from "./model";
+import { Data, Topic, minutesLabel } from "./model";
 import { ArrowRight, Play, Plus } from "@phosphor-icons/react";
 import { Empty } from "./components";
 
@@ -46,6 +46,7 @@ export function TopicFocus({
               <strong>{topic.name}</strong>
               <p>
                 {skill.name} · {topic.priority || "Medium"} priority
+                {topic.stoppedAt ? ` · resume at ${minutesLabel(topic.stoppedAt)}` : ""}
               </p>
             </div>
             <button
