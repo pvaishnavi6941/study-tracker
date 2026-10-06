@@ -81,6 +81,26 @@ export type Timer = {
   date: string;
   time: string;
 };
+export const APP_STATUSES = [
+  "Wishlist",
+  "Applied",
+  "Interviewing",
+  "Offer",
+  "Rejected",
+  "Withdrawn",
+] as const;
+export type AppStatus = (typeof APP_STATUSES)[number];
+export type Application = {
+  id: string;
+  company: string;
+  role: string;
+  status: AppStatus;
+  date: string;
+  url: string;
+  location: string;
+  notes: string;
+  createdAt: string;
+};
 export type Data = {
   version: 1;
   skills: Skill[];

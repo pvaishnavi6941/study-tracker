@@ -239,6 +239,11 @@ export function App({ userId }: { userId: string }) {
     window.location.hash = next;
     setPage(next);
     setFormError("");
+    if (window.innerWidth <= 760) {
+      requestAnimationFrame(() =>
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" }),
+      );
+    }
   };
   const notify = (message: string) => setToast(message);
   const ask = (

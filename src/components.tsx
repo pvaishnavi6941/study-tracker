@@ -146,7 +146,15 @@ export function HoursChart({
           <Tooltip
             contentStyle={tooltipStyle}
             cursor={{ fill: "rgba(170,205,255,.05)" }}
-            formatter={(v) => [`${v}h`, "Studied"]}
+            formatter={(v) => {
+              const hours = Number(v);
+              return [
+                hours < 1
+                  ? `${Number((hours * 60).toFixed(1))}m`
+                  : `${Number(hours.toFixed(1))}h`,
+                "Studied",
+              ];
+            }}
             labelFormatter={(_, payload) =>
               payload?.[0]?.payload.date || payload?.[0]?.payload.label
             }

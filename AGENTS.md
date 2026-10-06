@@ -1,5 +1,11 @@
 # Prototype Instructions
 
+Keep the mobile navbar fixed to the bottom with the existing liquid-glass style. Account for device safe areas and keep page content, session controls, and notifications clear of it.
+
+Mobile navigation taps must open the page at the top, including taps on the current tab. Keep Today's remaining-study-time display compact and aligned on desktop and mobile. Study chart tooltips show minutes below one hour and readable, rounded hours for longer durations.
+
+Log history cards hide notes. Clicking anywhere on a history card opens a glass modal showing one session card with its notes; left and right arrows browse entries in the displayed history order. Edit and delete buttons act independently without opening the viewer.
+
 Cadence uses Supabase Auth and PostgreSQL as the source of truth. Preserve the existing liquid-glass design. Never seed production study data or expose secret/service-role keys. Keep original browser study data untouched; cloud migration must be explicitly confirmed. Use owner RLS and composite foreign keys for all user-owned rows, and atomic revision-checked writes for related changes.
 
 Excel topic imports use the unchanged official workbook in public/Cadence_Blank_Topic_Template.xlsx. Read only its Topics sheet with exactly Topic and Priority columns. Assign the skill in Cadence, validate the entire file before an atomic save, reject duplicates within that skill, and preserve High/Medium/Low priority and source order. Never assign topic durations. Today’s Focus selects incomplete topics by priority/order; completion is an explicit user action and study time records actual duration.
