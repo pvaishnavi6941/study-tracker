@@ -63,6 +63,91 @@ async function setup() {
   return user;
 }
 describe("major user flows", () => {
+  it("deletes a selected topic chip independently while retaining logged history", async () => {
+    const user = await setup();
+    await user.click(screen.getByRole("button", { name: "Log" }));
+    await user.click(screen.getByRole("button", { name: "React.js" }));
+    await user.click(screen.getByRole("button", { name: "Effects" }));
+    await user.click(
+      screen.getByRole("button", { name: "Add 45m of React.js" }),
+    );
+    const original = structuredClone(stored().sessions[0]);
+    await user.click(screen.getByRole("button", { name: "React.js" }));
+    await user.click(
+      screen.getByRole("button", { name: "Delete topic Effects" }),
+    );
+    expect((screen.getByLabelText("TOPIC") as HTMLInputElement).value).toBe("");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(stored().topics).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Effects" }));
+    await user.click(
+      screen.getByRole("button", { name: "Delete topic Effects" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(stored().topics).toHaveLength(0);
+    expect(stored().sessions[0]).toEqual({ ...original, topicId: null });
+    expect((screen.getByLabelText("TOPIC") as HTMLInputElement).value).toBe("");
+    expect(
+      screen.queryByRole("button", { name: "Delete topic Effects" }),
+    ).toBeNull();
+  });
+  it("filters topics within the selected skill and preserves selected and custom topics", async () => {
+    const d = emptyData();
+    d.preferences.onboardingDone = true;
+    d.skills = ["JavaScript", "React"].map((name, i) => ({
+      id: `s${i}`,
+      name,
+      color: "#49cee3",
+      targetHours: 10,
+      createdAt: new Date().toISOString(),
+    }));
+    d.topics = [
+      { id: "t1", skillId: "s0", name: "JavaScript overview and runtime" },
+      { id: "t2", skillId: "s0", name: "JavaScript engines" },
+      { id: "t3", skillId: "s1", name: "React runtime" },
+    ].map((t) => ({
+      ...t,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+    }));
+    testCloud.snapshot.data = d;
+    const user = userEvent.setup();
+    render(<App userId="test-user-a" />);
+    await user.click(await screen.findByRole("button", { name: "Log" }));
+    await user.click(screen.getByRole("button", { name: "JavaScript" }));
+    const input = screen.getByLabelText("TOPIC");
+    const chips = within(document.getElementById("session-topic-options")!);
+    expect(chips.getAllByRole("button", { pressed: false })).toHaveLength(2);
+    await user.type(input, "  RUNTIME  javascript  ");
+    expect(chips.getAllByRole("button", { pressed: false })).toHaveLength(1);
+    await user.click(
+      chips.getByRole("button", { name: "JavaScript overview and runtime" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Add 45m of JavaScript" }),
+    );
+    expect(stored().sessions[0].topicId).toBe("t1");
+    await user.click(screen.getByRole("button", { name: "JavaScript" }));
+    await user.type(input, "runtime");
+    await user.click(screen.getByRole("button", { name: "React" }));
+    expect((input as HTMLInputElement).value).toBe("");
+    expect(chips.getAllByRole("button", { pressed: false })).toHaveLength(1);
+    await user.type(input, "Custom reading");
+    expect(chips.queryAllByRole("button")).toHaveLength(0);
+    expect(
+      within(document.querySelector(".session-form")!).getByRole("status")
+        .textContent,
+    ).toContain("No matching topics");
+    await user.clear(input);
+    expect(chips.getByRole("button", { name: "React runtime" })).toBeTruthy();
+    await user.type(input, "Custom reading");
+    await user.click(screen.getByRole("button", { name: "Add 45m of React" }));
+    const custom = stored().sessions.find((s) => s.topic === "Custom reading")!;
+    expect(custom.skillId).toBe("s1");
+    expect(stored().topics.find((t) => t.id === custom.topicId)?.name).toBe(
+      "Custom reading",
+    );
+  });
   it("onboards with zero activity and persists setup across remount", async () => {
     const user = await setup();
     expect(stored().skills).toHaveLength(1);
@@ -78,7 +163,9 @@ describe("major user flows", () => {
     await user.click(screen.getByRole("button", { name: "React.js" }));
     await user.click(screen.getByRole("button", { name: "Effects" }));
     await user.type(screen.getByLabelText("NOTES"), "Cleanup clicked");
-    await user.click(screen.getByRole("switch", { name: "Mark topic complete" }));
+    await user.click(
+      screen.getByRole("switch", { name: "Mark topic complete" }),
+    );
     await user.click(
       screen.getByRole("button", { name: "Add 45m of React.js" }),
     );

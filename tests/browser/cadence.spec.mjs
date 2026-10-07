@@ -129,6 +129,18 @@ test('auth, PostgreSQL persistence, calculations, and two-user isolation through
     await expect(page.locator('.mini-stats .inset').filter({ hasText: 'STUDIED' })).toContainText('0m');
     await page.getByRole('button', { name: 'Log', exact: true }).click();
     await page.getByRole('button', { name: 'JavaScript', exact: true }).click();
+    await page.getByLabel('TOPIC', { exact: true }).fill('  CLOS  ');
+    await expect(page.locator('.topic-chips .topic-chip-select')).toHaveCount(1);
+    await page.getByLabel('TOPIC', { exact: true }).fill('Custom reading');
+    await expect(page.locator('.topic-chips .topic-chip-select')).toHaveCount(0);
+    await expect(page.locator('.session-form').getByRole('status')).toContainText('No matching topics');
+    await page.getByLabel('TOPIC', { exact: true }).fill('');
+    await expect(page.locator('.topic-chips .topic-chip-select')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Delete topic Closures', exact: true }).click();
+    await expect(page.getByRole('dialog')).toContainText('Delete this topic?');
+    await expect(page.getByLabel('TOPIC', { exact: true })).toHaveValue('');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.locator('.topic-chips .topic-chip-select')).toHaveCount(1);
     await page.getByRole('button', { name: 'Closures', exact: true }).click();
     await page.getByLabel('NOTES', { exact: true }).fill('Browser integration verification');
     await page.getByRole('switch', { name: 'Mark topic complete' }).click();

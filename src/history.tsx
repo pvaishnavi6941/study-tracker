@@ -145,7 +145,7 @@ export function History({
         </div>
       ))}
       {selected && (
-        <Modal title="Study entry" onClose={() => setSelectedId(null)}>
+        <Modal title="Study entry" className="session-viewer-modal" onClose={() => setSelectedId(null)}>
           <div
             className="session-viewer"
             onKeyDown={(event) => {
@@ -199,7 +199,7 @@ export function History({
                 </span>
               </div>
               <span className="eyebrow">NOTES</span>
-              <p className="session-detail-notes">
+              <p key={selected.id} className="session-detail-notes" tabIndex={0} aria-label="Session notes">
                 {selected.notes || "No notes for this session."}
               </p>
             </article>

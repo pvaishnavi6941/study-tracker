@@ -1,10 +1,15 @@
 # Prototype Instructions
 
+In Log > Add study session, the topic input filters the selected skill's topic chips as the user types. Keep the liquid-glass chips, topic selection, completion indicators, and custom session topics available.
+Each Log topic chip has an independent delete control. Confirm deletion, remove its plans, keep sessions and study time as unlinked history, and protect topics used by an active timer.
+
 Keep the mobile navbar fixed to the bottom with the existing liquid-glass style. Account for device safe areas and keep page content, session controls, and notifications clear of it.
 
 Mobile navigation taps must open the page at the top, including taps on the current tab. Keep Today's remaining-study-time display compact and aligned on desktop and mobile. Study chart tooltips show minutes below one hour and readable, rounded hours for longer durations.
 
 Log history cards hide notes. Clicking anywhere on a history card opens a glass modal showing one session card with its notes; left and right arrows browse entries in the displayed history order. Edit and delete buttons act independently without opening the viewer.
+
+The study-entry viewer uses a wider card and a stable outer modal height. Scroll only the notes area; keep the header and navigation arrows in the same position when scrolling or browsing entries.
 
 Cadence uses Supabase Auth and PostgreSQL as the source of truth. Preserve the existing liquid-glass design. Never seed production study data or expose secret/service-role keys. Keep original browser study data untouched; cloud migration must be explicitly confirmed. Use owner RLS and composite foreign keys for all user-owned rows, and atomic revision-checked writes for related changes.
 

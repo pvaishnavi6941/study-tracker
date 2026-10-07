@@ -42,13 +42,26 @@ dialog{margin:auto}input[type=file]::file-selector-button{font:inherit;color:inh
 .session-topic:focus-visible{outline:none}
 .session-topic:focus-visible::after{outline:2px solid #9beedf;outline-offset:4px;border-radius:18px}
 .session-row:has(.session-topic)>.icon-button{position:relative;z-index:2}
-.session-detail{padding:22px}.session-detail h3{font-size:22px;overflow-wrap:anywhere;margin-bottom:12px}
+dialog.session-viewer-modal{width:min(800px,calc(100% - 32px));height:min(720px,calc(100dvh - 48px));overflow:hidden}
+.session-viewer-modal[open]{display:flex;flex-direction:column}
+.session-viewer-modal>.modal-head{flex-shrink:0}
+.session-viewer{display:flex;flex-direction:column;flex:1;min-height:0}
+.session-detail{padding:22px;display:flex;flex-direction:column;flex:1;min-height:0}.session-detail h3{font-size:22px;overflow-wrap:anywhere;margin-bottom:12px}
+.session-detail>:not(.session-detail-notes){flex-shrink:0}
 .session-detail-skill{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .session-detail-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0 24px;font-size:13px}
-.session-detail-notes{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:10px;font-size:14px}
-.session-viewer-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px}
+.topic-chip{padding:0 4px 0 0;gap:0;max-width:100%}
+.topic-chip-select{display:inline-flex;align-items:center;gap:7px;min-height:38px;min-width:0;padding:9px 10px 9px 13px;background:transparent;border:0;color:inherit;font:inherit;text-align:left;overflow-wrap:anywhere;border-radius:24px}
+.topic-chip-select svg{flex-shrink:0}
+.topic-chip-delete{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted)}
+.topic-chip-delete:hover{background:#ff839419;color:#ffb9c3}
+.topic-chip-delete:disabled{opacity:.5;cursor:default}
+.session-detail-notes{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:10px;font-size:14px;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;flex:1}
+.session-viewer-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;flex-shrink:0}
 .session-viewer-controls>span{color:var(--muted);font-size:13px}
 @media (max-width: 760px) {
+  dialog.session-viewer-modal{height:min(720px,calc(100dvh - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));max-height:calc(100dvh - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+  .session-viewer-modal .session-detail{padding:18px}
   .app-shell {
     --mobile-nav-top: calc(84px + env(safe-area-inset-bottom, 0px));
     padding-bottom: calc(var(--mobile-nav-top) + 26px);

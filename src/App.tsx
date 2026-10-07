@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent, ReactNode } from "react";
+import { useEffect, useMemo, useState, FormEvent, ReactNode } from "react";
 import {
   SquaresFour,
   Stack,
@@ -24,6 +24,7 @@ import {
   Skill,
   Session,
   Plan,
+  Topic,
   COLORS,
   uid,
   dayKey,
@@ -206,6 +207,26 @@ export function App({ userId }: { userId: string }) {
     [formError, setFormError] = useState("");
   const today = dayKey(new Date(now)),
     stats = streakStats(data, today);
+  const skillTopicIndex = useMemo(() => {
+    const completedIds = new Set(
+      data.sessions
+        .filter((s) => s.completed && s.topicId)
+        .map((s) => s.topicId),
+    );
+    return data.topics
+      .filter((t) => t.skillId === draft.skillId)
+      .map((topic) => ({
+        topic,
+        searchText: topic.name.toLowerCase(),
+        completed: !!topic.completedAt || completedIds.has(topic.id),
+      }));
+  }, [data.topics, data.sessions, draft.skillId]);
+  const matchingTopics = useMemo(() => {
+    const words = draft.topic.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return skillTopicIndex.filter(({ searchText }) =>
+      words.every((word) => searchText.includes(word)),
+    );
+  }, [skillTopicIndex, draft.topic]);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), data.timer ? 1000 : 30000);
     return () => clearInterval(id);
@@ -262,6 +283,35 @@ export function App({ userId }: { userId: string }) {
   const logSkill = (skillId: string) => {
     setDraft(newDraft(skillId));
     go("Log");
+  };
+  const deleteLogTopic = (topic: Topic) => {
+    ask(
+      "Delete this topic?",
+      "Its plans will be removed. Associated sessions and study time will be kept as unlinked history.",
+      async () => {
+        if (data.timer?.topicId === topic.id) {
+          notify("Finish or cancel this topic's active session first.");
+          return false;
+        }
+        const saved = await update((d) => ({
+          ...d,
+          topics: d.topics.filter((t) => t.id !== topic.id),
+          plans: d.plans.filter((p) => p.topicId !== topic.id),
+          sessions: d.sessions.map((s) =>
+            s.topicId === topic.id ? { ...s, topicId: null } : s,
+          ),
+        }));
+        if (saved) {
+          setDraft((d) =>
+            d.topicId === topic.id
+              ? { ...d, topicId: "", topic: d.id ? d.topic : "" }
+              : d,
+          );
+          notify("Topic deleted. Logged study time is kept.");
+        }
+        return saved;
+      },
+    );
   };
   const planStudy = () => {
     if (data.topics.length)
@@ -1290,7 +1340,9 @@ export function App({ userId }: { userId: string }) {
                       id="session-topic"
                       required
                       maxLength={200}
-                      placeholder="What did you work on?"
+                      placeholder="Search topics or enter what you worked on"
+                      aria-describedby="session-topic-help"
+                      aria-controls="session-topic-options"
                       value={draft.topic}
                       onChange={(e) =>
                         setDraft((d) => ({
@@ -1300,14 +1352,20 @@ export function App({ userId }: { userId: string }) {
                         }))
                       }
                     />
-                    <div className="topic-chips">
-                      {data.topics
-                        .filter((t) => t.skillId === draft.skillId)
-                        .map((t) => (
+                    <p className="footnote" id="session-topic-help">
+                      Type to filter, then select a topic below. You can also
+                      log a custom topic.
+                    </p>
+                    <div className="topic-chips" id="session-topic-options">
+                      {matchingTopics.map(({ topic: t, completed }) => (
+                        <div
+                          key={t.id}
+                          className={`chip topic-chip ${draft.topicId === t.id ? "chosen" : ""}`}
+                        >
                           <button
-                            className={`chip ${draft.topicId === t.id ? "chosen" : ""}`}
+                            className="topic-chip-select"
+                            aria-pressed={draft.topicId === t.id}
                             type="button"
-                            key={t.id}
                             onClick={() =>
                               setDraft((d) => ({
                                 ...d,
@@ -1317,10 +1375,29 @@ export function App({ userId }: { userId: string }) {
                             }
                           >
                             {t.name}
-                            {isTopicComplete(data, t) && <Check size={14} />}
+                            {completed && <Check size={14} />}
                           </button>
-                        ))}
+                          <button
+                            className="topic-chip-delete"
+                            type="button"
+                            aria-label={`Delete topic ${t.name}`}
+                            title={`Delete topic ${t.name}`}
+                            disabled={saving || readBlocked}
+                            onClick={() => deleteLogTopic(t)}
+                          >
+                            <Trash size={14} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
+                    {draft.skillId &&
+                      draft.topic.trim() &&
+                      !matchingTopics.length && (
+                        <p className="footnote" role="status">
+                          No matching topics. You can log this as a custom topic
+                          or clear the input to see all topics.
+                        </p>
+                      )}
                     <label className="field-label" htmlFor="duration">
                       DURATION
                     </label>
