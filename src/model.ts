@@ -38,13 +38,20 @@ export function incompleteTopics(data: Data) {
  * Today's Focus: the best incomplete topic of each skill first (by priority/order),
  * then the next best of each, so one skill with many High topics cannot crowd out the rest.
  */
-export function focusTopics(data: Data, limit = 3) {
+export function focusTopics(data: Data, limit = 3, pinnedIds: string[] = []) {
   const ranked = incompleteTopics(data),
-    bySkill = new Map<string, Topic[]>();
+    bySkill = new Map<string, Topic[]>(),
+    picked: Topic[] = pinnedIds
+      .map((id) => ranked.find((t) => t.id === id))
+      .filter((t): t is Topic => !!t)
+      .slice(0, limit);
   for (const topic of ranked)
-    bySkill.set(topic.skillId, [...(bySkill.get(topic.skillId) || []), topic]);
-  const queues = [...bySkill.values()],
-    picked: Topic[] = [];
+    if (!picked.includes(topic))
+      bySkill.set(topic.skillId, [
+        ...(bySkill.get(topic.skillId) || []),
+        topic,
+      ]);
+  const queues = [...bySkill.values()];
   for (let round = 0; picked.length < limit; round++) {
     const row = queues.map((q) => q[round]).filter(Boolean);
     if (!row.length) break;

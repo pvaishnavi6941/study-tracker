@@ -200,6 +200,14 @@ export function App({ userId }: { userId: string }) {
     [dialog, setDialog] = useState<Dialog | null>(null),
     [draft, setDraft] = useState<SessionDraft>(() => newDraft()),
     [focusSkillId, setFocusSkillId] = useState<string | null>(null),
+    [pinnedFocus, setPinnedFocus] = useState<string[]>(() => {
+      try {
+        const v = JSON.parse(localStorage.getItem("cadence.focusPins") || "[]");
+        return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+      } catch {
+        return [];
+      }
+    }),
     [mode, setMode] = useState<"Daily" | "Weekly" | "Monthly">("Daily"),
     [historyMode, setHistoryMode] = useState<"Daily" | "Weekly">("Daily"),
     [now, setNow] = useState(Date.now()),
@@ -349,7 +357,17 @@ export function App({ userId }: { userId: string }) {
             topics: data.topics.filter((t) => t.skillId === focusSkill.id),
           }
         : data,
+      3,
+      pinnedFocus,
     );
+  const savePins = (ids: string[]) => {
+    setPinnedFocus(ids);
+    try {
+      localStorage.setItem("cadence.focusPins", JSON.stringify(ids));
+    } catch {
+      /* preference only */
+    }
+  };
   const weekStart = shiftDay(today, -new Date(`${today}T12:00:00`).getDay());
   const weekPoints = Array.from(
     {
@@ -904,6 +922,9 @@ export function App({ userId }: { userId: string }) {
                   <TopicFocus
                     data={data}
                     topics={focusTopics}
+                    pinned={pinnedFocus}
+                    onPin={savePins}
+                    skillId={focusSkill?.id ?? null}
                     onStart={(topic) => {
                       void start(topic.skillId, topic.id, topic.name);
                     }}
