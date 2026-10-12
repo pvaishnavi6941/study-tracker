@@ -913,7 +913,10 @@ export function App({ userId }: { userId: string }) {
                             )
                           }
                         >
-                          <span className="dot" style={{ background: s.color }} />
+                          <span
+                            className="dot"
+                            style={{ background: s.color }}
+                          />
                           {s.name}
                         </button>
                       ))}
@@ -1160,132 +1163,142 @@ export function App({ userId }: { userId: string }) {
               </Card>
               {data.skills.length ? (
                 <div className="skills-grid">
-                  {data.skills.map((skill) => {
-                    const s = skillStats(data, skill, today);
-                    return (
-                      <Card key={skill.id} className="skill-card">
-                        <div className="card-heading">
-                          <h2>
+                  {data.skills
+                    .map((skill) => ({
+                      skill,
+                      s: skillStats(data, skill, today),
+                    }))
+                    .sort((a, b) => {
+                      if (!a.s.last !== !b.s.last) return a.s.last ? -1 : 1;
+                      return (b.s.last || "").localeCompare(a.s.last || "");
+                    })
+                    .map(({ skill, s }) => {
+                      return (
+                        <Card key={skill.id} className="skill-card">
+                          <div className="card-heading">
+                            <h2>
+                              <span
+                                className="dot glow"
+                                style={{
+                                  background: skill.color,
+                                }}
+                              />
+                              {skill.name}
+                            </h2>
                             <span
-                              className="dot glow"
-                              style={{
-                                background: skill.color,
-                              }}
-                            />
-                            {skill.name}
-                          </h2>
-                          <span
-                            className={`status ${s.status === "Needs revisit" ? "revisit" : ""}`}
-                          >
-                            {s.status}
-                          </span>
-                        </div>
-                        <div className="skill-progress">
-                          <strong>{s.progress}%</strong>
-                          <span>
-                            {isVideoSkill(skill)
-                              ? `${minutesLabel(videoProgress(skill).position)} of ${minutesLabel(videoProgress(skill).total)} watched`
-                              : `${s.completed} of ${s.topics.length} topics`}
-                          </span>
-                        </div>
-                        <Progress value={s.progress} color={skill.color} />
-                        <div className="skill-details">
-                          <div>
-                            <span>Invested</span>
-                            <strong>
-                              {hoursLabel(s.minutes)} of {skill.targetHours}h
-                            </strong>
+                              className={`status ${s.status === "Needs revisit" ? "revisit" : ""}`}
+                            >
+                              {s.status}
+                            </span>
                           </div>
-                          <div>
-                            <span>Last studied</span>
-                            <strong>{s.lastLabel}</strong>
+                          <div className="skill-progress">
+                            <strong>{s.progress}%</strong>
+                            <span>
+                              {isVideoSkill(skill)
+                                ? `${minutesLabel(videoProgress(skill).position)} of ${minutesLabel(videoProgress(skill).total)} watched`
+                                : `${s.completed} of ${s.topics.length} topics`}
+                            </span>
                           </div>
-                        </div>
-                        <button
-                          className="secondary full"
-                          onClick={() => logSkill(skill.id)}
-                        >
-                          Log a session
-                        </button>
-                        {isVideoSkill(skill) && (
+                          <Progress value={s.progress} color={skill.color} />
+                          <div className="skill-details">
+                            <div>
+                              <span>Invested</span>
+                              <strong>
+                                {hoursLabel(s.minutes)} of {skill.targetHours}h
+                              </strong>
+                            </div>
+                            <div>
+                              <span>Last studied</span>
+                              <strong>{s.lastLabel}</strong>
+                            </div>
+                          </div>
                           <button
                             className="secondary full"
-                            style={{ marginTop: 10 }}
-                            onClick={() => setDialog({ kind: "video", skill })}
+                            onClick={() => logSkill(skill.id)}
                           >
-                            Update video progress
+                            Log a session
                           </button>
-                        )}
-                        <div className="skill-tools">
-                          <button
-                            className="text-button"
-                            onClick={() =>
-                              setDialog({
-                                kind: "topics",
-                                skill,
-                              })
-                            }
-                          >
-                            Manage topics ({s.topics.length})
-                          </button>
-                          <button
-                            className="icon-button subtle"
-                            aria-label={`Edit ${skill.name}`}
-                            onClick={() =>
-                              setDialog({
-                                kind: "skill",
-                                skill,
-                              })
-                            }
-                          >
-                            <PencilSimple size={17} />
-                          </button>
-                          <button
-                            className="icon-button subtle"
-                            aria-label={`Delete ${skill.name}`}
-                            onClick={() =>
-                              ask(
-                                `Delete ${skill.name}?`,
-                                "This deletes the skill, its topics, plans, and all associated sessions. This cannot be undone.",
-                                async () => {
-                                  if (data.timer?.skillId === skill.id) {
-                                    notify(
-                                      "Finish or cancel this skill’s active session first.",
-                                    );
-                                    return false;
-                                  }
-                                  return await update((d) => {
-                                    const ids = new Set(
-                                      d.topics
-                                        .filter((t) => t.skillId === skill.id)
-                                        .map((t) => t.id),
-                                    );
-                                    return {
-                                      ...d,
-                                      skills: d.skills.filter(
-                                        (s) => s.id !== skill.id,
-                                      ),
-                                      topics: d.topics.filter(
-                                        (t) => t.skillId !== skill.id,
-                                      ),
-                                      sessions: d.sessions.filter(
-                                        (s) => s.skillId !== skill.id,
-                                      ),
-                                      plans: d.plans.filter(
-                                        (p) => !ids.has(p.topicId),
-                                      ),
-                                    };
-                                  });
-                                },
-                              )
-                            }
-                          >
-                            <Trash size={17} />
-                          </button>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                          {isVideoSkill(skill) && (
+                            <button
+                              className="secondary full"
+                              style={{ marginTop: 10 }}
+                              onClick={() =>
+                                setDialog({ kind: "video", skill })
+                              }
+                            >
+                              Update video progress
+                            </button>
+                          )}
+                          <div className="skill-tools">
+                            <button
+                              className="text-button"
+                              onClick={() =>
+                                setDialog({
+                                  kind: "topics",
+                                  skill,
+                                })
+                              }
+                            >
+                              Manage topics ({s.topics.length})
+                            </button>
+                            <button
+                              className="icon-button subtle"
+                              aria-label={`Edit ${skill.name}`}
+                              onClick={() =>
+                                setDialog({
+                                  kind: "skill",
+                                  skill,
+                                })
+                              }
+                            >
+                              <PencilSimple size={17} />
+                            </button>
+                            <button
+                              className="icon-button subtle"
+                              aria-label={`Delete ${skill.name}`}
+                              onClick={() =>
+                                ask(
+                                  `Delete ${skill.name}?`,
+                                  "This deletes the skill, its topics, plans, and all associated sessions. This cannot be undone.",
+                                  async () => {
+                                    if (data.timer?.skillId === skill.id) {
+                                      notify(
+                                        "Finish or cancel this skill’s active session first.",
+                                      );
+                                      return false;
+                                    }
+                                    return await update((d) => {
+                                      const ids = new Set(
+                                        d.topics
+                                          .filter((t) => t.skillId === skill.id)
+                                          .map((t) => t.id),
+                                      );
+                                      return {
+                                        ...d,
+                                        skills: d.skills.filter(
+                                          (s) => s.id !== skill.id,
+                                        ),
+                                        topics: d.topics.filter(
+                                          (t) => t.skillId !== skill.id,
+                                        ),
+                                        sessions: d.sessions.filter(
+                                          (s) => s.skillId !== skill.id,
+                                        ),
+                                        plans: d.plans.filter(
+                                          (p) => !ids.has(p.topicId),
+                                        ),
+                                      };
+                                    });
+                                  },
+                                )
+                              }
+                            >
+                              <Trash size={17} />
+                            </button>
+                          </div>
+                        </Card>
+                      );
+                    })}
                 </div>
               ) : (
                 <Card>
@@ -2171,10 +2184,10 @@ export function App({ userId }: { userId: string }) {
                       : dialog.kind === "video"
                         ? "Video progress"
                         : dialog.kind === "plan"
-                        ? "Plan your study"
-                        : dialog.kind === "finish"
-                          ? "Finish your session"
-                          : dialog.title
+                          ? "Plan your study"
+                          : dialog.kind === "finish"
+                            ? "Finish your session"
+                            : dialog.title
             }
             onClose={async () => {
               if (saving) return;
