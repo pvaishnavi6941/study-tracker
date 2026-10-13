@@ -51,7 +51,15 @@ export function TopicFocus({
           onChange={(e) => setQuery(e.target.value)}
         />
         <p className="muted">{chosen.length}/3 chosen · the rest fill in automatically</p>
-        <div style={{ maxHeight: 320, overflowY: "auto", display: "grid", gap: 8 }}>
+        <div
+          style={{
+            maxHeight: 320,
+            overflowY: "auto",
+            display: "grid",
+            gridAutoRows: "max-content",
+            gap: 8,
+          }}
+        >
           {options.map((t) => {
             const skill = data.skills.find((s) => s.id === t.skillId)!,
               on = chosen.includes(t.id),
@@ -64,14 +72,33 @@ export function TopicFocus({
                 aria-pressed={on}
                 disabled={full}
                 onClick={() => toggle(t.id)}
-                style={{ textAlign: "left" }}
+                style={{
+                  textAlign: "left",
+                  height: "auto",
+                  minHeight: 64,
+                  padding: "12px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  width: "100%",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
+                }}
               >
-                <span className="focus-index" style={{ borderColor: skill.color }}>
+                <span
+                  className="focus-index"
+                  style={{ borderColor: skill.color, flex: "none" }}
+                >
                   {on ? <Check size={14} /> : null}
                 </span>
-                <div className="row-copy">
-                  <strong>{t.name}</strong>
-                  <p>
+                <div
+                  className="row-copy"
+                  style={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}
+                >
+                  <strong style={{ display: "block", lineHeight: 1.35 }}>
+                    {t.name}
+                  </strong>
+                  <p style={{ margin: "4px 0 0" }}>
                     {skill.name} · {t.priority || "Medium"} priority
                   </p>
                 </div>
@@ -148,12 +175,22 @@ export function TopicFocus({
           </div>
         );
       })}
-      <button className="secondary full" onClick={() => setPicking(true)}>
-        <PencilSimple size={17} /> Choose my 3 topics
-      </button>
-      <button className="secondary full" onClick={onPlan}>
-        Plan today’s study <ArrowRight size={17} />
-      </button>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button
+          className="secondary full"
+          style={{ flex: "1 1 160px", width: "auto" }}
+          onClick={() => setPicking(true)}
+        >
+          <PencilSimple size={17} /> Choose my 3 topics
+        </button>
+        <button
+          className="secondary full"
+          style={{ flex: "1 1 160px", width: "auto" }}
+          onClick={onPlan}
+        >
+          Plan today’s study <ArrowRight size={17} />
+        </button>
+      </div>
     </div>
   );
 }
